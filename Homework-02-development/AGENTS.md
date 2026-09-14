@@ -36,6 +36,27 @@ behavior.
 
 ## Commands
 
-_To be filled in as the frontend/backend are scaffolded — record the exact
-commands used to start each here so they stay accurate for homework
-questions 4–7._
+Frontend:
+
+```
+cd frontend
+npm install
+npm run dev      # dev server at http://localhost:5173
+npm run build    # production build
+npm run lint     # oxlint
+```
+
+Backend: _to be filled in once scaffolded — record the exact commands here
+for homework questions 5–7._
+
+## Frontend notes
+
+- Scaffolded with Vite (`react` template) + `react-router-dom`.
+- `src/api/client.js` is the single module every page/component calls for
+  data — the "one file to change" when the real backend replaces the mock.
+- `src/api/mockBackend.js` is the mock implementation: an in-memory queue
+  persisted to `localStorage`, with a small pub/sub so open tabs (including
+  the public status page) stay in sync without polling. Delete this file
+  wholesale once the FastAPI backend is wired up.
+- Routes: `/` is the host dashboard, `/status` is the public, read-only
+  status lookup (by short code or phone number).

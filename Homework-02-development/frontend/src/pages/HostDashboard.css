@@ -1,0 +1,138 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+}
+
+.add-party-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.add-party-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.add-party-form input,
+.add-party-form textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-weight: 400;
+  resize: vertical;
+}
+
+.add-party-form input:focus,
+.add-party-form textarea:focus {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.notes-field {
+  grid-column: 1 / -1;
+}
+
+.add-party-form .primary-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.last-added {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--seated-bg);
+  color: var(--text);
+}
+
+.last-added-code {
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.last-added-link {
+  margin-top: 4px;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.queue-table th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.queue-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.queue-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.party-name {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.party-phone {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.party-notes {
+  max-width: 220px;
+  color: var(--text-muted);
+}
+
+.party-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+.history {
+  margin-top: 20px;
+}
+
+.history summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.queue-table--compact td,
+.queue-table--compact th {
+  padding: 8px 10px;
+}
+
+@media (max-width: 640px) {
+  .add-party-form {
+    grid-template-columns: 1fr;
+  }
+}

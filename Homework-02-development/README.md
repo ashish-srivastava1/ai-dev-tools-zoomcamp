@@ -22,13 +22,28 @@ See [`_docs/specs.md`](_docs/specs.md) for the full specification.
 
 ## Running locally
 
-_To be filled in once the frontend and backend exist — see `AGENTS.md` for
-the working conventions used to build this._
+### Frontend (mocked backend)
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:5173`. All data is mocked in
+[`frontend/src/api/mockBackend.js`](frontend/src/api/mockBackend.js) and
+persisted to `localStorage`, so state survives a refresh and stays in sync
+across tabs. Every backend call goes through
+[`frontend/src/api/client.js`](frontend/src/api/client.js) — that's the one
+file to change when the real backend is wired up.
+
+Backend setup is still to be filled in — see `AGENTS.md` for the working
+conventions used to build this.
 
 ## Status
 
 - [x] Spec written
-- [ ] Frontend prototype (mocked backend)
+- [x] Frontend prototype (mocked backend)
 - [ ] Backend (FastAPI, mock DB)
 - [ ] Frontend/backend integration
 - [ ] Real database (SQLite + SQLAlchemy)
