@@ -87,7 +87,10 @@ uv add --project backend --dev <package>                               # add a d
   on a database-specific column type) keeps the schema portable.
 - `src/backend/db.py` — engine/session setup. `DATABASE_URL` (env var)
   defaults to a SQLite file at `backend/tableturn.db`; swapping to
-  Postgres/MySQL later should only mean changing this URL. `init_db()` runs
+  Postgres/MySQL later should only mean changing this URL.
+  `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` take priority over it when set
+  (used for the free Render+Turso deploy — see `backend/README.md`).
+  `init_db()` runs
   on app startup (see `main.py`'s `lifespan`).
 - `src/backend/schemas.py` — pydantic request/response models; validation
   (non-blank name/phone, `party_size >= 1`) lives here via `field_validator`.
