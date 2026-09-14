@@ -1,12 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .db import init_db
 from .routes import parties, stats, status
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
 
 app = FastAPI(
     title="TableTurn API",
     description="Single-restaurant waitlist manager backend. See /_docs/specs.md and /openapi.yaml.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Wide open for local dev against the Vite frontend; tighten once deployed.

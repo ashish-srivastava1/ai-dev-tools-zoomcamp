@@ -75,19 +75,33 @@ uv add --project backend --dev <package>                               # add a d
 
 ## Backend notes
 
-- `src/backend/store.py` — the mock database: an in-memory `PartyStore`
-  keyed by id, with methods for the queue transitions, code/phone lookup,
-  and the derived fields (queue position, wait estimate, stats). Swap for a
-  SQLAlchemy-backed store later; routes only depend on this class's public
-  methods, not its internals.
+- `src/backend/store.py` — `PartyStore`, backed by a real database via
+  SQLAlchemy. Methods for the queue transitions, code/phone lookup, and the
+  derived fields (queue position, wait estimate, stats). Routes only depend
+  on this class's public methods, not its internals — this is the one file
+  that knows any SQL.
+- `src/backend/models.py` — the SQLAlchemy ORM model (`PartyRow`) and a
+  `UTCDateTime` `TypeDecorator` that normalizes every datetime to naive-UTC
+  on write and reattaches `tzinfo=UTC` on read. SQLite has no native
+  timezone-aware datetime type; doing this explicitly (rather than leaning
+  on a database-specific column type) keeps the schema portable.
+- `src/backend/db.py` — engine/session setup. `DATABASE_URL` (env var)
+  defaults to a SQLite file at `backend/tableturn.db`; swapping to
+  Postgres/MySQL later should only mean changing this URL. `init_db()` runs
+  on app startup (see `main.py`'s `lifespan`).
 - `src/backend/schemas.py` — pydantic request/response models; validation
   (non-blank name/phone, `party_size >= 1`) lives here via `field_validator`.
-- `src/backend/deps.py` — `get_store()` FastAPI dependency; tests override it
-  with a fresh `PartyStore` per test (see `tests/conftest.py`) so state never
-  leaks between tests.
+- `src/backend/deps.py` — `get_store()` FastAPI dependency; builds a
+  `PartyStore` from a fresh per-request `Session` (`db.get_session`). Tests
+  override `get_store` directly with one `PartyStore` per test, bound to an
+  isolated in-memory SQLite DB (see `tests/conftest.py`), so state never
+  leaks between tests — note `tests/test_persistence.py` uses real files on
+  disk instead, since that's the only way to actually prove persistence.
 - `src/backend/routes/` — one router per resource (`parties`, `stats`,
   `status`), thin wrappers that translate store exceptions
   (`PartyNotFoundError` → 404, `InvalidTransitionError` → 409) into HTTP
   responses.
 - Endpoints match `../openapi.yaml` exactly — check both when changing the
   API shape.
+- `tableturn.db` (the real SQLite file) is gitignored (`*.db`). Delete it to
+  reset all data; it's recreated empty on the next app startup.

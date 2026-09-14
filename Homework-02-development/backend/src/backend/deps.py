@@ -1,9 +1,9 @@
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from .db import get_session
 from .store import PartyStore
 
-# Single shared store for the running app (single-restaurant, no multi-tenant
-# support per the spec). Tests override this dependency with a fresh store.
-_store = PartyStore()
 
-
-def get_store() -> PartyStore:
-    return _store
+def get_store(session: Session = Depends(get_session)) -> PartyStore:
+    return PartyStore(session)

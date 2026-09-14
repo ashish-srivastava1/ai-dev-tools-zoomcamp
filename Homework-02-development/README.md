@@ -17,7 +17,7 @@ See [`_docs/specs.md`](_docs/specs.md) for the full specification.
 
 - **Frontend:** React
 - **Backend:** FastAPI (Python), managed with `uv`
-- **Database:** SQLite via SQLAlchemy (mock store initially, swapped in later)
+- **Database:** SQLite via SQLAlchemy
 - **API contract:** OpenAPI (`openapi.yaml`)
 
 ## Running locally
@@ -25,17 +25,21 @@ See [`_docs/specs.md`](_docs/specs.md) for the full specification.
 Run both together — the frontend calls the backend directly over HTTP, so
 neither is useful alone.
 
-### Backend (mock database)
+### Backend
 
 ```
 uv run --project backend uvicorn backend.main:app --reload --port 8000
 ```
 
 Opens the API at `http://localhost:8000` (interactive docs at `/docs`).
-Data lives in an in-memory store ([`backend/src/backend/store.py`](backend/src/backend/store.py))
-that implements the [`openapi.yaml`](openapi.yaml) contract.
+Data is persisted to a SQLite file at `backend/tableturn.db` (created
+automatically on first run) via SQLAlchemy
+([`backend/src/backend/store.py`](backend/src/backend/store.py)), behind
+the same [`openapi.yaml`](openapi.yaml) contract as before — swapping the
+mock store for a real database didn't change the API. Delete the file to
+reset all data.
 
-Run the test suite (written before the endpoints, per `AGENTS.md`):
+Run the test suite:
 
 ```
 uv run --project backend pytest
@@ -61,4 +65,4 @@ only file touched to swap the mock for the real API.
 - [x] Frontend prototype (mocked backend)
 - [x] Backend (FastAPI, mock DB)
 - [x] Frontend/backend integration
-- [ ] Real database (SQLite + SQLAlchemy)
+- [x] Real database (SQLite + SQLAlchemy)

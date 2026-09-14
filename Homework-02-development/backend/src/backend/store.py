@@ -1,24 +1,28 @@
-"""In-memory mock of the parties table.
+"""Party store, backed by a real database via SQLAlchemy.
 
-This is a placeholder for a real database (SQLite via SQLAlchemy, added
-later in the homework). Routes only depend on the public methods below, so
-swapping the backing store later shouldn't require route changes.
+Routes only depend on `PartyStore`'s public methods (see routes/*.py), so
+this is the one place that knows about SQL — swapping databases later
+should mean changing `db.py`'s `DATABASE_URL`, not this file.
 """
 
 from __future__ import annotations
 
-import itertools
 import random
 import uuid
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Literal
 
-Status = Literal["waiting", "called", "seated", "removed"]
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from .models import PartyRow
 
 DEFAULT_AVG_SEATING_MINUTES = 15
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
 _CODE_LENGTH = 4
+
+# The row *is* the domain object here — routes and tests read/write its
+# attributes directly, same as they did with the old in-memory dataclass.
+Party = PartyRow
 
 
 class PartyNotFoundError(Exception):
@@ -29,35 +33,18 @@ class InvalidTransitionError(Exception):
     pass
 
 
-@dataclass
-class Party:
-    id: str
-    code: str
-    name: str
-    party_size: int
-    phone_number: str
-    notes: str
-    status: Status
-    created_at: datetime
-    seq: int
-    called_at: datetime | None = None
-    seated_at: datetime | None = None
-    removed_at: datetime | None = None
-
-
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
 class PartyStore:
-    def __init__(self) -> None:
-        self._parties: dict[str, Party] = {}
-        self._seq = itertools.count()
+    def __init__(self, session: Session) -> None:
+        self._session = session
 
     # -- mutations ---------------------------------------------------
 
-    def add(self, *, name: str, party_size: int, phone_number: str, notes: str) -> Party:
-        party = Party(
+    def add(self, *, name: str, party_size: int, phone_number: str, notes: str) -> PartyRow:
+        row = PartyRow(
             id=str(uuid.uuid4()),
             code=self._generate_code(),
             name=name,
@@ -66,83 +53,86 @@ class PartyStore:
             notes=notes,
             status="waiting",
             created_at=_utcnow(),
-            seq=next(self._seq),
         )
-        self._parties[party.id] = party
-        return party
+        self._session.add(row)
+        self._session.commit()
+        return row
 
-    def call(self, party_id: str) -> Party:
+    def call(self, party_id: str) -> PartyRow:
         party = self.get(party_id)
         if party.status != "waiting":
             raise InvalidTransitionError("Only waiting parties can be called.")
         party.status = "called"
         party.called_at = _utcnow()
+        self._session.commit()
         return party
 
-    def seat(self, party_id: str) -> Party:
+    def seat(self, party_id: str) -> PartyRow:
         party = self.get(party_id)
         if party.status not in ("waiting", "called"):
             raise InvalidTransitionError("Only waiting or called parties can be seated.")
         party.status = "seated"
         party.seated_at = _utcnow()
+        self._session.commit()
         return party
 
-    def remove(self, party_id: str) -> Party:
+    def remove(self, party_id: str) -> PartyRow:
         party = self.get(party_id)
         if party.status not in ("waiting", "called"):
             raise InvalidTransitionError("Only waiting or called parties can be removed.")
         party.status = "removed"
         party.removed_at = _utcnow()
+        self._session.commit()
         return party
 
     # -- reads ---------------------------------------------------------
 
-    def get(self, party_id: str) -> Party:
-        try:
-            return self._parties[party_id]
-        except KeyError:
-            raise PartyNotFoundError(party_id) from None
+    def get(self, party_id: str) -> PartyRow:
+        party = self._session.scalar(select(PartyRow).where(PartyRow.id == party_id))
+        if party is None:
+            raise PartyNotFoundError(party_id)
+        return party
 
-    def list_all(self) -> list[Party]:
-        return sorted(self._parties.values(), key=lambda p: (p.created_at, p.seq))
+    def list_all(self) -> list[PartyRow]:
+        stmt = select(PartyRow).order_by(PartyRow.created_at, PartyRow.seq)
+        return list(self._session.scalars(stmt))
 
-    def waiting_in_order(self) -> list[Party]:
-        return sorted(
-            (p for p in self._parties.values() if p.status == "waiting"),
-            key=lambda p: (p.created_at, p.seq),
+    def waiting_in_order(self) -> list[PartyRow]:
+        stmt = (
+            select(PartyRow)
+            .where(PartyRow.status == "waiting")
+            .order_by(PartyRow.created_at, PartyRow.seq)
         )
+        return list(self._session.scalars(stmt))
 
-    def find_by_code(self, code: str) -> Party | None:
+    def find_by_code(self, code: str) -> PartyRow | None:
         normalized = code.strip().upper()
-        for party in self._parties.values():
-            if party.code == normalized:
-                return party
-        return None
+        return self._session.scalar(select(PartyRow).where(PartyRow.code == normalized))
 
-    def find_by_phone(self, phone_number: str) -> Party | None:
+    def find_by_phone(self, phone_number: str) -> PartyRow | None:
         normalized = phone_number.strip()
-        matches = [p for p in self._parties.values() if p.phone_number == normalized]
-        if not matches:
-            return None
-        return max(matches, key=lambda p: (p.created_at, p.seq))
+        stmt = (
+            select(PartyRow)
+            .where(PartyRow.phone_number == normalized)
+            .order_by(PartyRow.created_at.desc(), PartyRow.seq.desc())
+            .limit(1)
+        )
+        return self._session.scalar(stmt)
 
     def average_seating_minutes(self) -> float:
-        completed = [p for p in self._parties.values() if p.status == "seated" and p.seated_at]
+        completed = self._seated_rows()
         if not completed:
             return DEFAULT_AVG_SEATING_MINUTES
         total = sum((p.seated_at - p.created_at).total_seconds() / 60 for p in completed)
         return total / len(completed)
 
     def stats(self) -> dict:
-        waiting_count = sum(1 for p in self._parties.values() if p.status == "waiting")
-        called_count = sum(1 for p in self._parties.values() if p.status == "called")
+        waiting_count = self._count_where(PartyRow.status == "waiting")
+        called_count = self._count_where(PartyRow.status == "called")
 
         today = _utcnow().date()
-        seated_today = [
-            p
-            for p in self._parties.values()
-            if p.status == "seated" and p.seated_at and p.seated_at.date() == today
-        ]
+        seated_today = [p for p in self._seated_rows() if p.seated_at.date() == today]
+
         avg_wait_today_minutes = None
         if seated_today:
             total = sum((p.seated_at - p.created_at).total_seconds() / 60 for p in seated_today)
@@ -156,7 +146,7 @@ class PartyStore:
 
     # -- derived view --------------------------------------------------
 
-    def to_out_dict(self, party: Party) -> dict:
+    def to_out_dict(self, party: PartyRow) -> dict:
         """Party fields plus queue position / wait estimate, computed fresh."""
         base = {
             "id": party.id,
@@ -194,8 +184,16 @@ class PartyStore:
 
     # -- internals -------------------------------------------------------
 
+    def _seated_rows(self) -> list[PartyRow]:
+        stmt = select(PartyRow).where(PartyRow.status == "seated", PartyRow.seated_at.is_not(None))
+        return list(self._session.scalars(stmt))
+
+    def _count_where(self, *clauses) -> int:
+        stmt = select(func.count()).select_from(PartyRow).where(*clauses)
+        return self._session.scalar(stmt) or 0
+
     def _generate_code(self) -> str:
-        existing = {p.code for p in self._parties.values()}
+        existing = set(self._session.scalars(select(PartyRow.code)))
         while True:
             code = "".join(random.choices(_CODE_ALPHABET, k=_CODE_LENGTH))
             if code not in existing:
