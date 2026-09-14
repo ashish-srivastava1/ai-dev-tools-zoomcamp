@@ -1,0 +1,27 @@
+# --- Python / uv (backend) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv/
+.pytest_cache/
+*.db
+*.sqlite3
+
+# --- Node (frontend) ---
+node_modules/
+dist/
+build/
+.vite/
+*.log
+npm-debug.log*
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Env / secrets ---
+.env
+.env.local
