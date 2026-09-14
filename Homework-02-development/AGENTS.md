@@ -46,8 +46,14 @@ npm run build    # production build
 npm run lint     # oxlint
 ```
 
-Backend: _to be filled in once scaffolded — record the exact commands here
-for homework questions 5–7._
+Backend:
+
+```
+uv run --project backend uvicorn backend.main:app --reload --port 8000  # dev server at http://localhost:8000 (docs at /docs)
+uv run --project backend pytest                                        # test suite
+uv add --project backend <package>                                     # add a runtime dependency
+uv add --project backend --dev <package>                               # add a dev dependency
+```
 
 ## Frontend notes
 
@@ -60,3 +66,22 @@ for homework questions 5–7._
   wholesale once the FastAPI backend is wired up.
 - Routes: `/` is the host dashboard, `/status` is the public, read-only
   status lookup (by short code or phone number).
+
+## Backend notes
+
+- `src/backend/store.py` — the mock database: an in-memory `PartyStore`
+  keyed by id, with methods for the queue transitions, code/phone lookup,
+  and the derived fields (queue position, wait estimate, stats). Swap for a
+  SQLAlchemy-backed store later; routes only depend on this class's public
+  methods, not its internals.
+- `src/backend/schemas.py` — pydantic request/response models; validation
+  (non-blank name/phone, `party_size >= 1`) lives here via `field_validator`.
+- `src/backend/deps.py` — `get_store()` FastAPI dependency; tests override it
+  with a fresh `PartyStore` per test (see `tests/conftest.py`) so state never
+  leaks between tests.
+- `src/backend/routes/` — one router per resource (`parties`, `stats`,
+  `status`), thin wrappers that translate store exceptions
+  (`PartyNotFoundError` → 404, `InvalidTransitionError` → 409) into HTTP
+  responses.
+- Endpoints match `../openapi.yaml` exactly — check both when changing the
+  API shape.

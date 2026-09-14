@@ -37,13 +37,27 @@ across tabs. Every backend call goes through
 [`frontend/src/api/client.js`](frontend/src/api/client.js) — that's the one
 file to change when the real backend is wired up.
 
-Backend setup is still to be filled in — see `AGENTS.md` for the working
-conventions used to build this.
+### Backend (mock database)
+
+```
+uv run --project backend uvicorn backend.main:app --reload --port 8000
+```
+
+Opens the API at `http://localhost:8000` (interactive docs at `/docs`).
+Data lives in an in-memory store ([`backend/src/backend/store.py`](backend/src/backend/store.py))
+that implements the [`openapi.yaml`](openapi.yaml) contract — no frontend
+wiring yet, that's a later homework question.
+
+Run the test suite (written before the endpoints, per `AGENTS.md`):
+
+```
+uv run --project backend pytest
+```
 
 ## Status
 
 - [x] Spec written
 - [x] Frontend prototype (mocked backend)
-- [ ] Backend (FastAPI, mock DB)
+- [x] Backend (FastAPI, mock DB)
 - [ ] Frontend/backend integration
 - [ ] Real database (SQLite + SQLAlchemy)
