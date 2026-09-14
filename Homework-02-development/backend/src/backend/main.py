@@ -20,10 +20,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Wide open for local dev against the Vite frontend; tighten once deployed.
+# Local dev, plus the Vercel-deployed frontend — its production domain and
+# every preview-deployment subdomain both match *.vercel.app.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
