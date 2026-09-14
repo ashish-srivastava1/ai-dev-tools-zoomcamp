@@ -59,13 +59,19 @@ uv add --project backend --dev <package>                               # add a d
 
 - Scaffolded with Vite (`react` template) + `react-router-dom`.
 - `src/api/client.js` is the single module every page/component calls for
-  data — the "one file to change" when the real backend replaces the mock.
-- `src/api/mockBackend.js` is the mock implementation: an in-memory queue
-  persisted to `localStorage`, with a small pub/sub so open tabs (including
-  the public status page) stay in sync without polling. Delete this file
-  wholesale once the FastAPI backend is wired up.
+  data. It now calls the real FastAPI backend (`VITE_API_BASE_URL`, default
+  `http://localhost:8000`) — this is the only file that changed when the mock
+  was swapped out; no page/component was touched. It also translates
+  snake_case API fields to the camelCase every page uses, and turns
+  `{ detail }` error responses into `Error` messages.
+- Queue updates are polled every 4s (plus an immediate refresh after any
+  mutation made from the same tab) via `subscribeToQueue`, since the backend
+  has no websocket/SSE channel — the localStorage-driven instant cross-tab
+  sync from the mocked version is gone now that state lives server-side.
 - Routes: `/` is the host dashboard, `/status` is the public, read-only
   status lookup (by short code or phone number).
+- Run both `npm run dev` (frontend) and the backend's `uvicorn` command
+  together for the app to work — see root `README.md`.
 
 ## Backend notes
 

@@ -22,20 +22,8 @@ See [`_docs/specs.md`](_docs/specs.md) for the full specification.
 
 ## Running locally
 
-### Frontend (mocked backend)
-
-```
-cd frontend
-npm install
-npm run dev
-```
-
-Opens at `http://localhost:5173`. All data is mocked in
-[`frontend/src/api/mockBackend.js`](frontend/src/api/mockBackend.js) and
-persisted to `localStorage`, so state survives a refresh and stays in sync
-across tabs. Every backend call goes through
-[`frontend/src/api/client.js`](frontend/src/api/client.js) — that's the one
-file to change when the real backend is wired up.
+Run both together — the frontend calls the backend directly over HTTP, so
+neither is useful alone.
 
 ### Backend (mock database)
 
@@ -45,8 +33,7 @@ uv run --project backend uvicorn backend.main:app --reload --port 8000
 
 Opens the API at `http://localhost:8000` (interactive docs at `/docs`).
 Data lives in an in-memory store ([`backend/src/backend/store.py`](backend/src/backend/store.py))
-that implements the [`openapi.yaml`](openapi.yaml) contract — no frontend
-wiring yet, that's a later homework question.
+that implements the [`openapi.yaml`](openapi.yaml) contract.
 
 Run the test suite (written before the endpoints, per `AGENTS.md`):
 
@@ -54,10 +41,24 @@ Run the test suite (written before the endpoints, per `AGENTS.md`):
 uv run --project backend pytest
 ```
 
+### Frontend
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:5173` and talks to the backend at
+`http://localhost:8000` by default (override with `VITE_API_BASE_URL`, see
+`frontend/.env.example`). Every backend call goes through
+[`frontend/src/api/client.js`](frontend/src/api/client.js) — that was the
+only file touched to swap the mock for the real API.
+
 ## Status
 
 - [x] Spec written
 - [x] Frontend prototype (mocked backend)
 - [x] Backend (FastAPI, mock DB)
-- [ ] Frontend/backend integration
+- [x] Frontend/backend integration
 - [ ] Real database (SQLite + SQLAlchemy)
