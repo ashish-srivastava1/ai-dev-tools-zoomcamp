@@ -69,4 +69,6 @@ only file touched to swap the mock for the real API.
 
 ## TableTurn Demo
 
-[Watch the demo video](demo/TableTurn.mp4)
+https://github.com/user-attachments/assets/0a2dc6f9-7216-4ea1-9766-30b93253e1f6
+
+
