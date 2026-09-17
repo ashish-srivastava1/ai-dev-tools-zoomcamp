@@ -66,3 +66,7 @@ only file touched to swap the mock for the real API.
 - [x] Backend (FastAPI, mock DB)
 - [x] Frontend/backend integration
 - [x] Real database (SQLite + SQLAlchemy)
+
+## TableTurn Demo
+
+[Watch the demo video](demo/TableTurn.mp4)
