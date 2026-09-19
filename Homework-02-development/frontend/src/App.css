@@ -183,3 +183,24 @@
   background: var(--removed-bg);
   color: var(--removed);
 }
+
+.server-notice {
+  background: var(--waiting-bg);
+  border: 1px solid var(--waiting);
+  color: var(--text-h);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.server-notice p {
+  margin: 4px 0;
+}
+
+.server-notice-title {
+  color: var(--waiting);
+  font-weight: 700;
+  font-size: 15px;
+}

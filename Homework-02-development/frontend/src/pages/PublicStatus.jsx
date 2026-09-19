@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { lookupStatus, subscribeToQueue } from '../api/client';
+import ServerSleepingNotice from '../components/ServerSleepingNotice';
 import StatusBadge from '../components/StatusBadge';
 import { formatMinutes, minutesSince } from '../lib/time';
 import './PublicStatus.css';
@@ -23,18 +24,31 @@ export default function PublicStatus() {
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [serverDown, setServerDown] = useState(false);
+  // Live updates poll every few seconds; don't stack lookups while one is
+  // still waiting on a sleeping server.
+  const lookupInFlight = useRef(false);
 
   const runLookup = useCallback(async ({ code: c, phoneNumber: p }) => {
     if (!c && !p) return;
+    if (lookupInFlight.current) return;
+    lookupInFlight.current = true;
     setLoading(true);
     setError(null);
     try {
       const result = await lookupStatus({ code: c, phoneNumber: p });
       setParty(result);
       setNotFound(!result);
+      setServerDown(false);
     } catch (err) {
-      setError(err.message);
+      if (err.isServerUnavailable) {
+        setServerDown(true);
+      } else {
+        setServerDown(false);
+        setError(err.message);
+      }
     } finally {
+      lookupInFlight.current = false;
       setLoading(false);
     }
   }, []);
@@ -70,6 +84,7 @@ export default function PublicStatus() {
 
   return (
     <div className="public-status">
+      {serverDown && <ServerSleepingNotice />}
       <section className="panel status-lookup-panel">
         <h2>Check your wait status</h2>
         <p className="status-help">Enter the short code you were given, or your phone number.</p>

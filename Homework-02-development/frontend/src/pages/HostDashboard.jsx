@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { addParty, callParty, removeParty, seatParty } from '../api/client';
+import ServerSleepingNotice from '../components/ServerSleepingNotice';
 import StatusBadge from '../components/StatusBadge';
 import { useLiveQueue } from '../hooks/useLiveQueue';
 import { formatMinutes, minutesSince } from '../lib/time';
@@ -8,13 +9,15 @@ import './HostDashboard.css';
 const EMPTY_FORM = { name: '', partySize: '2', phoneNumber: '', notes: '' };
 
 export default function HostDashboard() {
-  const { queue, stats, loading, refresh } = useLiveQueue();
+  const { queue, stats, loading, serverDown: pollingServerDown, refresh } = useLiveQueue();
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
   const [pendingId, setPendingId] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [actionServerDown, setActionServerDown] = useState(false);
+  const serverDown = pollingServerDown || actionServerDown;
   const [, forceTick] = useState(0);
 
   // Re-render periodically so "wait so far" keeps ticking up.
@@ -29,6 +32,7 @@ export default function HostDashboard() {
   async function handleAddParty(event) {
     event.preventDefault();
     setFormError(null);
+    setActionServerDown(false);
     setSubmitting(true);
     try {
       const created = await addParty({
@@ -41,7 +45,8 @@ export default function HostDashboard() {
       setLastAdded(created);
       await refresh();
     } catch (err) {
-      setFormError(err.message);
+      if (err.isServerUnavailable) setActionServerDown(true);
+      else setFormError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -49,6 +54,7 @@ export default function HostDashboard() {
 
   async function handleAction(action, id) {
     setActionError(null);
+    setActionServerDown(false);
     setPendingId(id);
     try {
       if (action === 'call') await callParty(id);
@@ -56,7 +62,8 @@ export default function HostDashboard() {
       if (action === 'remove') await removeParty(id);
       await refresh();
     } catch (err) {
-      setActionError(err.message);
+      if (err.isServerUnavailable) setActionServerDown(true);
+      else setActionError(err.message);
     } finally {
       setPendingId(null);
     }
@@ -64,6 +71,7 @@ export default function HostDashboard() {
 
   return (
     <div className="dashboard">
+      {serverDown && <ServerSleepingNotice />}
       <section className="panel add-party-panel">
         <h2>Add a party</h2>
         <form onSubmit={handleAddParty} className="add-party-form">
@@ -149,7 +157,9 @@ export default function HostDashboard() {
 
         <h2>Current queue</h2>
         {loading ? (
-          <p className="empty-state">Loading queue…</p>
+          <p className="empty-state">
+            {serverDown ? 'The queue will appear once the server is back.' : 'Loading queue…'}
+          </p>
         ) : activeParties.length === 0 ? (
           <p className="empty-state">No one is waiting right now.</p>
         ) : (

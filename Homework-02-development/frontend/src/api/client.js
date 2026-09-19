@@ -12,15 +12,45 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 const POLL_INTERVAL_MS = 4000;
 
+// The free-tier host shuts the backend down after a period of inactivity, so
+// the first requests after a quiet spell hang or fail until it has started
+// again (a "cold start"). Anything that looks like that is reported as a
+// ServerUnavailableError so the UI can show a friendly message instead of
+// spinning forever.
+const REQUEST_TIMEOUT_MS = 20000;
+
+export const SERVER_SLEEPING_MESSAGE =
+  'The server is asleep after a period of inactivity (cold start). Please wait about 10 minutes and try again.';
+
+export class ServerUnavailableError extends Error {
+  constructor() {
+    super(SERVER_SLEEPING_MESSAGE);
+    this.name = 'ServerUnavailableError';
+    this.isServerUnavailable = true;
+  }
+}
+
 async function request(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       headers: { 'Content-Type': 'application/json' },
       ...options,
+      signal: controller.signal,
     });
   } catch {
-    throw new Error('Could not reach the server. Is the backend running?');
+    // Timed out, network error, or a CORS failure from a host that isn't
+    // answering yet — all look the same from here.
+    throw new ServerUnavailableError();
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  // Gateway errors are what the host's proxy returns while the app is starting.
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    throw new ServerUnavailableError();
   }
 
   if (!response.ok) {
