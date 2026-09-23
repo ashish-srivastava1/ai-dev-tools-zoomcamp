@@ -1,0 +1,114 @@
+:root {
+  --text: #4b4657;
+  --text-h: #08060d;
+  --text-muted: #837c8f;
+  --bg: #faf9fc;
+  --surface: #ffffff;
+  --border: #e5e4e7;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --waiting: #b45309;
+  --waiting-bg: rgba(180, 83, 9, 0.12);
+  --called: #1d4ed8;
+  --called-bg: rgba(29, 78, 216, 0.12);
+  --seated: #15803d;
+  --seated-bg: rgba(21, 128, 61, 0.12);
+  --removed: #6b7280;
+  --removed-bg: rgba(107, 114, 128, 0.12);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --shadow: rgba(20, 10, 30, 0.06) 0 1px 2px, rgba(20, 10, 30, 0.05) 0 8px 24px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 15px/1.5 var(--sans);
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #b7b2c2;
+    --text-h: #f3f4f6;
+    --text-muted: #837c8f;
+    --bg: #121016;
+    --surface: #1a1720;
+    --border: #302c3a;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.15);
+    --accent-border: rgba(192, 132, 252, 0.5);
+    --waiting: #fbbf24;
+    --waiting-bg: rgba(251, 191, 36, 0.14);
+    --called: #60a5fa;
+    --called-bg: rgba(96, 165, 250, 0.14);
+    --seated: #4ade80;
+    --seated-bg: rgba(74, 222, 128, 0.14);
+    --removed: #9ca3af;
+    --removed-bg: rgba(156, 163, 175, 0.14);
+    --danger: #f87171;
+    --danger-bg: rgba(248, 113, 113, 0.14);
+    --shadow: rgba(0, 0, 0, 0.4) 0 1px 2px, rgba(0, 0, 0, 0.3) 0 8px 24px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 4px;
+}
+
+h1 {
+  font-size: 22px;
+  letter-spacing: -0.3px;
+}
+
+h2 {
+  font-size: 17px;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  font-family: var(--mono);
+}

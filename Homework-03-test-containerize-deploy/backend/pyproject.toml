@@ -1,0 +1,33 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "TableTurn API — FastAPI backend for the waitlist manager"
+readme = "README.md"
+authors = [
+    { name = "ashish-srivastava1", email = "Ashish.Srivastava@bentley.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "sqlalchemy>=2.0.52",
+]
+
+# Turso's Python driver ships prebuilt wheels for Linux/macOS only (see
+# https://pypi.org/project/libsql-experimental/) — it has no Windows wheel
+# and fails to compile from source without a Rust+MSVC toolchain. The
+# `sys_platform` marker keeps it out of resolution entirely on Windows dev
+# machines; Render (Linux) installs it via `uv sync --extra turso`.
+[project.optional-dependencies]
+turso = [
+    "sqlalchemy-libsql>=0.2.0; sys_platform != 'win32'",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]

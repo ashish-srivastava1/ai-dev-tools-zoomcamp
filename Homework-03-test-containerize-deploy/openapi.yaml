@@ -1,0 +1,285 @@
+openapi: 3.1.0
+info:
+  title: TableTurn API
+  description: >
+    API for a single-restaurant waitlist manager. See _docs/specs.md for the
+    full product specification. This contract is the source of truth shared
+    between the frontend and backend.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8000
+
+tags:
+  - name: parties
+    description: Host-facing waitlist management
+  - name: stats
+    description: Dashboard counters
+  - name: status
+    description: Public, read-only status lookup
+
+paths:
+  /api/parties:
+    get:
+      operationId: listParties
+      tags: [parties]
+      summary: List the full queue (all statuses), FIFO by join time
+      responses:
+        "200":
+          description: The queue, each party annotated with its derived queue position and wait estimate
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Party"
+    post:
+      operationId: addParty
+      tags: [parties]
+      summary: Add a party to the waitlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyCreate"
+      responses:
+        "201":
+          description: The created party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/parties/{partyId}/call:
+    post:
+      operationId: callParty
+      tags: [parties]
+      summary: Mark a waiting party as called (notified, waiting to seat)
+      parameters:
+        - $ref: "#/components/parameters/PartyId"
+      responses:
+        "200":
+          description: The updated party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/InvalidTransition"
+
+  /api/parties/{partyId}/seat:
+    post:
+      operationId: seatParty
+      tags: [parties]
+      summary: Mark a waiting or called party as seated (completes them)
+      parameters:
+        - $ref: "#/components/parameters/PartyId"
+      responses:
+        "200":
+          description: The updated party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/InvalidTransition"
+
+  /api/parties/{partyId}/remove:
+    post:
+      operationId: removeParty
+      tags: [parties]
+      summary: Remove a waiting or called party (no-show / left)
+      parameters:
+        - $ref: "#/components/parameters/PartyId"
+      responses:
+        "200":
+          description: The updated party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/InvalidTransition"
+
+  /api/stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Dashboard counters — parties waiting, called, and today's average wait
+      responses:
+        "200":
+          description: Current stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /api/status:
+    get:
+      operationId: getStatus
+      tags: [status]
+      summary: Public lookup of a single party's status, by short code or phone number
+      description: >
+        Exactly one of `code` or `phone_number` should be provided. If both
+        are given, `code` takes precedence. If a phone number matches
+        multiple parties, the most recently added one is returned.
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+          example: BEAN
+        - name: phone_number
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "555-010-1234"
+      responses:
+        "200":
+          description: The matching party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+components:
+  parameters:
+    PartyId:
+      name: partyId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    NotFound:
+      description: No party with that id/code/phone number
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidTransition:
+      description: The party's current status does not allow this action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: The request body or query parameters are invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    PartyStatus:
+      type: string
+      enum: [waiting, called, seated, removed]
+
+    PartyCreate:
+      type: object
+      required: [name, party_size, phone_number]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        party_size:
+          type: integer
+          minimum: 1
+        phone_number:
+          type: string
+          minLength: 1
+        notes:
+          type: string
+          default: ""
+
+    Party:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - party_size
+        - phone_number
+        - notes
+        - status
+        - created_at
+        - called_at
+        - seated_at
+        - removed_at
+        - position
+        - parties_ahead
+        - estimated_wait_minutes
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          description: Short code customers use to look up their status on the public page
+        name:
+          type: string
+        party_size:
+          type: integer
+        phone_number:
+          type: string
+        notes:
+          type: string
+        status:
+          $ref: "#/components/schemas/PartyStatus"
+        created_at:
+          type: string
+          format: date-time
+        called_at:
+          type: [string, "null"]
+          format: date-time
+        seated_at:
+          type: [string, "null"]
+          format: date-time
+        removed_at:
+          type: [string, "null"]
+          format: date-time
+        position:
+          type: [integer, "null"]
+          description: 1-based position among currently-waiting parties; null unless status is "waiting"
+        parties_ahead:
+          type: [integer, "null"]
+          description: Number of waiting parties ahead of this one; null unless status is "waiting"
+        estimated_wait_minutes:
+          type: [integer, "null"]
+          description: >
+            (parties_ahead) × (average historical seating time, default 15
+            min). 0 for called parties, null for seated/removed.
+
+    Stats:
+      type: object
+      required: [waiting_count, called_count, avg_wait_today_minutes]
+      properties:
+        waiting_count:
+          type: integer
+        called_count:
+          type: integer
+        avg_wait_today_minutes:
+          type: [integer, "null"]
+          description: Average wait (join to seat) for parties seated today; null if none seated yet today
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
