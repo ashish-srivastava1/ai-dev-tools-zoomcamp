@@ -1,10 +1,30 @@
-# One container that builds the frontend, then serves it plus the API from the
-# FastAPI backend (see Dockerfile). Bring it up with:
+# Two services — Postgres and the app. The app image builds the frontend and
+# serves it plus the API from FastAPI (see Dockerfile); Postgres is the
+# production-style database (local `uv run` dev still defaults to SQLite).
+#
+# Bring it up with:
 #
 #   docker compose up --build
 #
 # then open http://localhost:8000 (API docs at /docs).
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tableturn
+      POSTGRES_PASSWORD: tableturn
+      POSTGRES_DB: tableturn
+    volumes:
+      # Keep the database across restarts / `docker compose down`.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The app waits on this (see depends_on below) so it never starts
+      # before Postgres can accept connections.
+      test: ["CMD-SHELL", "pg_isready -U tableturn -d tableturn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
@@ -14,14 +34,13 @@ services:
     environment:
       # The backend reads $PORT; keep it aligned with the mapping above.
       PORT: "8000"
-      # Persisted SQLite DB path (see the volume below). Overridable — point
-      # DATABASE_URL at Postgres, or set TURSO_* vars, to swap databases
-      # without touching the image.
-      DATABASE_URL: "sqlite:////data/tableturn.db"
-    volumes:
-      # Keep the database across container restarts / `--rm`. Without this the
-      # SQLite file lives inside the container and is lost when it's removed.
-      - tableturn-data:/data
+      # Talk to the `db` service over Compose's private network. psycopg 3 is
+      # the driver (see backend/pyproject.toml). Swap this URL to point at a
+      # managed Postgres in deployment.
+      DATABASE_URL: "postgresql+psycopg://tableturn:tableturn@db:5432/tableturn"
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -31,4 +50,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  tableturn-data:
+  pgdata:
