@@ -32,3 +32,7 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
 ]
+
+# Note: pytest config lives in ../pytest.ini (the repo root), not here — that's
+# the working directory for `uv run --project backend pytest`, so it's what
+# pytest discovers as its rootdir config.
