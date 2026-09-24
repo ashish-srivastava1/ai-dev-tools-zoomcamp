@@ -44,10 +44,22 @@ the same [`openapi.yaml`](openapi.yaml) contract as before — swapping the
 mock store for a real database didn't change the API. Delete the file to
 reset all data.
 
-Run the test suite:
+Run the unit test suite (fast, no Docker — in-process app against in-memory
+SQLite):
 
 ```
 uv run --project backend pytest
+```
+
+The **integration tests** ([`backend/tests/integration/`](backend/tests/integration))
+are black-box: a session fixture runs `docker compose up --build`, then the
+tests hit the running container over HTTP and verify what only the real image
+can — that the frontend is served, the app is backed by Postgres, and data
+survives an app restart. They're marked `integration` and excluded from the
+default run, so they need Docker and are invoked explicitly:
+
+```
+uv run --project backend pytest -m integration
 ```
 
 ### Frontend
@@ -127,7 +139,7 @@ Homework 3 (this folder):
 
 - [x] Containerize (`Dockerfile` + `docker-compose.yml`)
 - [x] Migrate SQLite → Postgres
-- [ ] Integration tests (`tests/integration/`)
+- [x] Integration tests (`backend/tests/integration/`)
 - [ ] End-to-end tests (Playwright)
 - [ ] CI workflow (lint, unit, integration, build) — `.github/workflows/ci.yml`
 - [ ] CD workflow (deploy on main after tests pass) — `.github/workflows/deploy.yml`
