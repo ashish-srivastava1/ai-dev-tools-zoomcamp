@@ -71,6 +71,37 @@ having started the backend locally — shows a plain "can't reach the
 backend, is it running?" message instead. See the `reason` handling in
 [`frontend/src/api/client.js`](frontend/src/api/client.js).
 
+## Running with Docker
+
+The whole app — frontend **and** backend — runs from a single container. A
+multi-stage [`Dockerfile`](Dockerfile) builds the React frontend with Node,
+then copies the static bundle into a Python image where the FastAPI backend
+serves both the API (`/api/...`, `/health`) and the SPA (everything else) on
+one origin. Because they share an origin, the frontend calls the API with
+relative URLs — no `VITE_API_BASE_URL` or CORS needed.
+
+With [Docker](https://www.docker.com/products/docker-desktop/) installed and
+running:
+
+```
+docker compose up --build
+```
+
+Open `http://localhost:8000` for the app (API docs at `/docs`). The SQLite
+database is persisted in a named volume (`tableturn-data`), so data survives
+restarts. Stop with `Ctrl+C`, or `docker compose down` (add `-v` to also wipe
+the database volume).
+
+Prefer plain Docker? The same thing without compose:
+
+```
+docker build -t tableturn .
+docker run --rm -p 8000:8000 -v tableturn-data:/data -e DATABASE_URL=sqlite:////data/tableturn.db tableturn
+```
+
+To point at a different database (e.g. Postgres later in this module), set
+`DATABASE_URL` — nothing in the image assumes SQLite.
+
 ## Status
 
 Inherited from Homework 2:
@@ -83,7 +114,7 @@ Inherited from Homework 2:
 
 Homework 3 (this folder):
 
-- [ ] Containerize (`Dockerfile` + `docker-compose.yml`)
+- [x] Containerize (`Dockerfile` + `docker-compose.yml`)
 - [ ] Migrate SQLite → Postgres
 - [ ] Integration tests (`tests/integration/`)
 - [ ] End-to-end tests (Playwright)

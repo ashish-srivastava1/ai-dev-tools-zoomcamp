@@ -1,0 +1,34 @@
+# One container that builds the frontend, then serves it plus the API from the
+# FastAPI backend (see Dockerfile). Bring it up with:
+#
+#   docker compose up --build
+#
+# then open http://localhost:8000 (API docs at /docs).
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # The backend reads $PORT; keep it aligned with the mapping above.
+      PORT: "8000"
+      # Persisted SQLite DB path (see the volume below). Overridable — point
+      # DATABASE_URL at Postgres, or set TURSO_* vars, to swap databases
+      # without touching the image.
+      DATABASE_URL: "sqlite:////data/tableturn.db"
+    volumes:
+      # Keep the database across container restarts / `--rm`. Without this the
+      # SQLite file lives inside the container and is lost when it's removed.
+      - tableturn-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  tableturn-data:

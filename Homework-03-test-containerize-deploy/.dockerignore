@@ -1,0 +1,31 @@
+# Python / uv (backend) — rebuilt inside the image
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+backend/.venv/
+.venv/
+.uv/
+.pytest_cache/
+**/*.db
+**/*.sqlite3
+
+# Node (frontend) — reinstalled/rebuilt inside the image
+frontend/node_modules/
+frontend/dist/
+**/.vite/
+**/*.log
+
+# Local env / secrets (do not bake into the image)
+**/.env
+**/.env.local
+
+# Editors / OS / tooling
+.git/
+.gitignore
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+demo/
+_docs/
