@@ -22,7 +22,7 @@ See [`_docs/specs.md`](_docs/specs.md) for the full specification.
 
 - **Frontend:** React
 - **Backend:** FastAPI (Python), managed with `uv`
-- **Database:** SQLite via SQLAlchemy (moving to Postgres as part of this module)
+- **Database:** SQLAlchemy — SQLite for local dev, Postgres in containers/deploy (swap via `DATABASE_URL`)
 - **API contract:** OpenAPI (`openapi.yaml`)
 
 ## Running locally
@@ -80,6 +80,14 @@ serves both the API (`/api/...`, `/health`) and the SPA (everything else) on
 one origin. Because they share an origin, the frontend calls the API with
 relative URLs — no `VITE_API_BASE_URL` or CORS needed.
 
+[`docker-compose.yml`](docker-compose.yml) runs **two services** — a
+Postgres database and the app — which is the production-style setup: local
+`uv run` dev uses SQLite (zero setup), while containers use Postgres. The
+backend is database-agnostic (SQLAlchemy + a portable `UTCDateTime` column
+type), so the switch is just the `DATABASE_URL` env var — no model or query
+changes. Postgres runs the [psycopg 3](https://www.psycopg.org/psycopg3/)
+driver.
+
 With [Docker](https://www.docker.com/products/docker-desktop/) installed and
 running:
 
@@ -87,20 +95,23 @@ running:
 docker compose up --build
 ```
 
-Open `http://localhost:8000` for the app (API docs at `/docs`). The SQLite
-database is persisted in a named volume (`tableturn-data`), so data survives
-restarts. Stop with `Ctrl+C`, or `docker compose down` (add `-v` to also wipe
-the database volume).
+Open `http://localhost:8000` for the app (API docs at `/docs`). Compose
+health-checks Postgres and holds the app back (`depends_on: service_healthy`)
+until the database is ready to accept connections. Postgres data is persisted
+in a named volume (`pgdata`), so it survives restarts. Stop with `Ctrl+C`, or
+`docker compose down` (add `-v` to also wipe the database volume).
 
-Prefer plain Docker? The same thing without compose:
+Prefer plain Docker without Postgres? The image still runs standalone on
+SQLite — handy for a quick smoke test:
 
 ```
 docker build -t tableturn .
-docker run --rm -p 8000:8000 -v tableturn-data:/data -e DATABASE_URL=sqlite:////data/tableturn.db tableturn
+docker run --rm -p 8000:8000 tableturn
 ```
 
-To point at a different database (e.g. Postgres later in this module), set
-`DATABASE_URL` — nothing in the image assumes SQLite.
+To point at any other database (a managed Postgres in deployment, for
+example), set `DATABASE_URL` — e.g.
+`postgresql+psycopg://user:pass@host:5432/dbname`.
 
 ## Status
 
@@ -115,7 +126,7 @@ Inherited from Homework 2:
 Homework 3 (this folder):
 
 - [x] Containerize (`Dockerfile` + `docker-compose.yml`)
-- [ ] Migrate SQLite → Postgres
+- [x] Migrate SQLite → Postgres
 - [ ] Integration tests (`tests/integration/`)
 - [ ] End-to-end tests (Playwright)
 - [ ] CI workflow (lint, unit, integration, build) — `.github/workflows/ci.yml`
