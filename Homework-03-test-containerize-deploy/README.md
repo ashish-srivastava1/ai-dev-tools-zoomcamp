@@ -113,6 +113,23 @@ To point at any other database (a managed Postgres in deployment, for
 example), set `DATABASE_URL` — e.g.
 `postgresql+psycopg://user:pass@host:5432/dbname`.
 
+## Deploying to AWS
+
+Infrastructure-as-code lives in [`deploy/aws/`](deploy/aws). A CloudFormation
+template stands up **one EC2 instance** running **Caddy + the app + Postgres**
+via docker compose — the instance clones this repo, builds the image, and
+serves the app behind Caddy (optional Let's Encrypt HTTPS) on a stable Elastic
+IP. With the AWS CLI configured:
+
+```
+cd deploy/aws
+POSTGRES_PASSWORD='choose-a-strong-one' ./deploy.sh up     # create/update the stack
+./deploy.sh down                                            # tear it all down
+```
+
+See [`deploy/aws/README.md`](deploy/aws/README.md) for prerequisites, the full
+parameter list, enabling HTTPS with a domain, connecting over SSM, and cost.
+
 ## Status
 
 Inherited from Homework 2:
@@ -131,7 +148,7 @@ Homework 3 (this folder):
 - [ ] End-to-end tests (Playwright)
 - [ ] CI workflow (lint, unit, integration, build) — `.github/workflows/ci.yml`
 - [ ] CD workflow (deploy on main after tests pass) — `.github/workflows/deploy.yml`
-- [ ] Deploy to Render with a managed Postgres database
+- [x] AWS deploy as CloudFormation IaC (EC2 + Caddy + Postgres) — `deploy/aws/` (run `./deploy.sh up` in your account)
 - [ ] `docs/testing.md`, `docs/deployment.md`, `docs/release-process.md`
 
 ## TableTurn Demo
