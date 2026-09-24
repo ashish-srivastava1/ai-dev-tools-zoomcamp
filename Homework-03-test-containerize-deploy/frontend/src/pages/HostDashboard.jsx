@@ -9,7 +9,14 @@ import './HostDashboard.css';
 const EMPTY_FORM = { name: '', partySize: '2', phoneNumber: '', notes: '' };
 
 export default function HostDashboard() {
-  const { queue, stats, loading, serverDown: pollingServerDown, refresh } = useLiveQueue();
+  const {
+    queue,
+    stats,
+    loading,
+    serverDown: pollingServerDown,
+    serverDownReason: pollingServerDownReason,
+    refresh,
+  } = useLiveQueue();
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -17,7 +24,9 @@ export default function HostDashboard() {
   const [pendingId, setPendingId] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [actionServerDown, setActionServerDown] = useState(false);
+  const [actionServerDownReason, setActionServerDownReason] = useState('gateway');
   const serverDown = pollingServerDown || actionServerDown;
+  const serverDownReason = pollingServerDown ? pollingServerDownReason : actionServerDownReason;
   const [, forceTick] = useState(0);
 
   // Re-render periodically so "wait so far" keeps ticking up.
@@ -45,7 +54,10 @@ export default function HostDashboard() {
       setLastAdded(created);
       await refresh();
     } catch (err) {
-      if (err.isServerUnavailable) setActionServerDown(true);
+      if (err.isServerUnavailable) {
+        setActionServerDown(true);
+        setActionServerDownReason(err.reason ?? 'gateway');
+      }
       else setFormError(err.message);
     } finally {
       setSubmitting(false);
@@ -62,7 +74,10 @@ export default function HostDashboard() {
       if (action === 'remove') await removeParty(id);
       await refresh();
     } catch (err) {
-      if (err.isServerUnavailable) setActionServerDown(true);
+      if (err.isServerUnavailable) {
+        setActionServerDown(true);
+        setActionServerDownReason(err.reason ?? 'gateway');
+      }
       else setActionError(err.message);
     } finally {
       setPendingId(null);
@@ -71,7 +86,7 @@ export default function HostDashboard() {
 
   return (
     <div className="dashboard">
-      {serverDown && <ServerSleepingNotice />}
+      {serverDown && <ServerSleepingNotice reason={serverDownReason} />}
       <section className="panel add-party-panel">
         <h2>Add a party</h2>
         <form onSubmit={handleAddParty} className="add-party-form">

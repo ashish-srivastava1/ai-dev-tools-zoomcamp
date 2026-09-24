@@ -22,11 +22,14 @@ const REQUEST_TIMEOUT_MS = 20000;
 export const SERVER_SLEEPING_MESSAGE =
   'The server is asleep after a period of inactivity (cold start). Please wait about 10 minutes and try again.';
 
+export const SERVER_UNREACHABLE_MESSAGE = `Can't reach the server at ${API_BASE_URL}. Is the backend running?`;
+
 export class ServerUnavailableError extends Error {
-  constructor() {
-    super(SERVER_SLEEPING_MESSAGE);
+  constructor(reason = 'gateway') {
+    super(reason === 'network' ? SERVER_UNREACHABLE_MESSAGE : SERVER_SLEEPING_MESSAGE);
     this.name = 'ServerUnavailableError';
     this.isServerUnavailable = true;
+    this.reason = reason;
   }
 }
 
@@ -41,16 +44,17 @@ async function request(path, options = {}) {
       signal: controller.signal,
     });
   } catch {
-    // Timed out, network error, or a CORS failure from a host that isn't
-    // answering yet — all look the same from here.
-    throw new ServerUnavailableError();
+    // Our own timeout firing looks like a slow-to-wake host (a real cold
+    // start) — anything else (connection refused, DNS failure, CORS) means
+    // there's simply nothing answering at API_BASE_URL right now.
+    throw new ServerUnavailableError(controller.signal.aborted ? 'gateway' : 'network');
   } finally {
     clearTimeout(timeout);
   }
 
   // Gateway errors are what the host's proxy returns while the app is starting.
   if (response.status === 502 || response.status === 503 || response.status === 504) {
-    throw new ServerUnavailableError();
+    throw new ServerUnavailableError('gateway');
   }
 
   if (!response.ok) {

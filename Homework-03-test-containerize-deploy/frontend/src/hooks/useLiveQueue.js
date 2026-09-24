@@ -12,6 +12,7 @@ export function useLiveQueue() {
   const [stats, setStats] = useState({ waitingCount: 0, calledCount: 0, avgWaitTodayMinutes: null });
   const [loading, setLoading] = useState(true);
   const [serverDown, setServerDown] = useState(false);
+  const [serverDownReason, setServerDownReason] = useState('gateway');
 
   // Only one refresh at a time: while the server is asleep each request can
   // hang for a while, and polling every few seconds would pile them up.
@@ -37,6 +38,7 @@ export function useLiveQueue() {
         } catch (err) {
           if (err.isServerUnavailable) {
             setServerDown(true);
+            setServerDownReason(err.reason ?? 'gateway');
           } else {
             console.error(err);
             setLoading(false);
@@ -56,5 +58,5 @@ export function useLiveQueue() {
     return unsubscribe;
   }, [refresh]);
 
-  return { queue, stats, loading, serverDown, refresh };
+  return { queue, stats, loading, serverDown, serverDownReason, refresh };
 }

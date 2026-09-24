@@ -25,6 +25,7 @@ export default function PublicStatus() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [serverDown, setServerDown] = useState(false);
+  const [serverDownReason, setServerDownReason] = useState('gateway');
   // Live updates poll every few seconds; don't stack lookups while one is
   // still waiting on a sleeping server.
   const lookupInFlight = useRef(false);
@@ -43,6 +44,7 @@ export default function PublicStatus() {
     } catch (err) {
       if (err.isServerUnavailable) {
         setServerDown(true);
+        setServerDownReason(err.reason ?? 'gateway');
       } else {
         setServerDown(false);
         setError(err.message);
@@ -84,7 +86,7 @@ export default function PublicStatus() {
 
   return (
     <div className="public-status">
-      {serverDown && <ServerSleepingNotice />}
+      {serverDown && <ServerSleepingNotice reason={serverDownReason} />}
       <section className="panel status-lookup-panel">
         <h2>Check your wait status</h2>
         <p className="status-help">Enter the short code you were given, or your phone number.</p>
