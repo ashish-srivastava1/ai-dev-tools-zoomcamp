@@ -1,0 +1,5 @@
+Incident responder received a TEST notification.
+Alert: ResponderTest
+No telemetry anomaly to investigate and no code to change.
+Verified the responder pipeline end to end: alert parsed, incident recorded, agent invoked.
+No action required: this was a test notification with no incident to fix.

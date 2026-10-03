@@ -1,0 +1,6 @@
+Incident responder received a FIRING alert and gathered context.
+Affected endpoint: GET /api/orders/{order_id}
+Summary: Order Tracker is returning 5xx errors
+Saved logs, traces and the 5xx metric alongside this incident.
+No coding assistant is wired up yet (set AGENT_CMD or install the claude CLI), so I cannot apply a fix automatically.
+Escalating to a developer: configure the coding assistant to let the responder investigate and patch the root cause.

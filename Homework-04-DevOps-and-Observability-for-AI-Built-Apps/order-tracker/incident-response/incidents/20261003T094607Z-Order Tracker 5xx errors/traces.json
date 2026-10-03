@@ -1,0 +1,150 @@
+{
+  "traces": [
+    {
+      "traceID": "99caa8fc66058f575e9a75ff6b8a36ba",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020661403642091",
+      "durationMs": 1
+    },
+    {
+      "traceID": "b0ec4143407e3616ea2866f606aba96b",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020656343934671",
+      "durationMs": 1
+    },
+    {
+      "traceID": "93e418f5e2f92ea18cb59c2a03f4514d",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020651282875444",
+      "durationMs": 1
+    },
+    {
+      "traceID": "11429d3e8a12b9199e2997433dfa747e",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020646224679275",
+      "durationMs": 1
+    },
+    {
+      "traceID": "6f53ed18166570882d570750546fc6f6",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020641164274334",
+      "durationMs": 1
+    },
+    {
+      "traceID": "66d92c4858df5213fc1702f61f317643",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020636105757232",
+      "durationMs": 1
+    },
+    {
+      "traceID": "4c0d9c0749a602dea23ae122eaf66044",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020631045794334",
+      "durationMs": 1
+    },
+    {
+      "traceID": "3fc116248c8d424d9401ee0a097a4012",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020625983303966",
+      "durationMs": 1
+    },
+    {
+      "traceID": "3d12d606422299af6a224db958e2e1fc",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020620914888306",
+      "durationMs": 1
+    },
+    {
+      "traceID": "2307a8050c9fb78d7124bda01c974f02",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020615856736939",
+      "durationMs": 1
+    },
+    {
+      "traceID": "c8b9cfd7447fe22af5dd5022cf0f3f1f",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020610792996294",
+      "durationMs": 1
+    },
+    {
+      "traceID": "82112b18b9889b79a05b93f51baae770",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020605725622068",
+      "durationMs": 1
+    },
+    {
+      "traceID": "f2040594c28f750fa25e16a719d1a48f",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020600660809770",
+      "durationMs": 1
+    },
+    {
+      "traceID": "c30ff6da41e79d1d8c90a0a69a85b734",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020595596976719",
+      "durationMs": 1
+    },
+    {
+      "traceID": "ec2c46079d46000c0eb7ff8ce8e524a5",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020590528544985",
+      "durationMs": 1
+    },
+    {
+      "traceID": "b9b693dc21d98ee2f878656a798b3926",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020585466967849",
+      "durationMs": 1
+    },
+    {
+      "traceID": "78e82a81350df311debd95f147700c15",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020580395985171",
+      "durationMs": 1
+    },
+    {
+      "traceID": "e7e6fe6271594a45cccf524fb222ab6b",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020575327865223",
+      "durationMs": 1
+    },
+    {
+      "traceID": "87ba1c6d53d74b87052f921a7e490752",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020570254231400",
+      "durationMs": 1
+    },
+    {
+      "traceID": "db2d1ee43da33aa828d66bb2b2e57cc8",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020565185938980",
+      "durationMs": 1
+    }
+  ],
+  "metrics": {
+    "inspectedTraces": 20,
+    "inspectedBytes": "179625",
+    "completedJobs": 1,
+    "totalJobs": 1
+  }
+}

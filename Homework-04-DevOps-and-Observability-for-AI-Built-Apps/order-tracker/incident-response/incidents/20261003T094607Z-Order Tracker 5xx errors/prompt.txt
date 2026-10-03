@@ -1,0 +1,191 @@
+You are an on-call incident responder running in headless mode, with access to the order-tracker repository at D:\Ashish\claude\ashish_claude\ai-dev-tools-zoomcamp\Homework-04-DevOps-and-Observability-for-AI-Built-Apps\order-tracker.
+
+A Grafana alert just fired for 5xx errors.
+- Affected endpoint: GET /api/orders/{order_id}
+- Time window: last 5m
+- Summary: Order Tracker is returning 5xx errors
+- Description: 8.477747774777477 server error(s) in the last 5m on the order lookup endpoint. Investigate immediately.
+
+Evidence gathered from telemetry:
+METRIC (5xx counts):
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "http_route": "/api/orders/{order_id}",
+          "http_status_code": "500"
+        },
+        "value": [
+          1791020770.108,
+          "6"
+        ]
+      }
+    ]
+  }
+}
+
+LOGS (recent):
+{
+  "status": "success",
+  "data": {
+    "resultType": "streams",
+    "result": [
+      {
+        "stream": {
+          "code_file_path": "/app/app/main.py",
+          "code_function_name": "get_order",
+          "code_line_number": "149",
+          "detected_level": "info",
+          "flags": "3",
+          "observed_timestamp": "1791020741020723050",
+          "scope_name": "order-tracker",
+          "service_instance_id": "7e46351b-e166-48a7-8750-bacb8f718267",
+          "service_name": "order-tracker",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "20e3854d586de85a",
+          "telemetry_sdk_language": "python",
+          "telemetry_sdk_name": "opentelemetry",
+          "telemetry_sdk_version": "1.45.0",
+          "trace_id": "39ec72919bf1c45f31e7dc3ff390dfc9"
+        },
+        "values": [
+          [
+            "1791020741020686080",
+            "order lookup requested order_id=express-1002"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "code_file_path": "/app/app/main.py",
+          "code_function_name": "get_order",
+          "code_line_number": "149",
+          "detected_level": "info",
+          "flags": "3",
+          "observed_timestamp": "1791020742473668314",
+          "scope_name": "order-tracker",
+          "service_instance_id": "7e46351b-e166-48a7-8750-bacb8f718267",
+          "service_name": "order-tracker",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "543b9f6799de00a2",
+          "telemetry_sdk_language": "python",
+          "telemetry_sdk_name": "opentelemetry",
+          "telemetry_sdk_version": "1.45.0",
+          "trace_id": "11c8c955301736acb67d7057914ce282"
+        },
+        "values": [
+          [
+            "1791020742473619456",
+            "order lookup requested order_id=express-1002"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "code_file_path": "/app/app/main.py",
+          "code_function_name": "get_order",
+          "code_line_number": "149",
+          "detected_level": "info",
+          "flags": "3",
+          "observed_timestamp": "1791020743927728899",
+          "scope_name": "order-tracker",
+          "service_instance_id": "7e46351b-e166-48a7-8750-bacb8f718267",
+          "service_name": "order-tracker",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "e0c23d47e74cc966",
+          "telemetry_sdk_language": "python",
+          "telemetry_sdk_name": "opentelemetry",
+          "telemetry_sdk_version": "1.45.0",
+          "trace_id": "c6e4c1e635892f6e51eb794f1b801d68"
+        },
+        "values": [
+          [
+            "1791020743927686144",
+            "order lookup requested order_id=express-1002"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "code_file_path": "/app/app/main.py",
+          "code_function_name": "get_order",
+          "code_line_number": "149",
+          "detected_level": "info",
+         
+
+TRACES (recent):
+{
+  "traces": [
+    {
+      "traceID": "99caa8fc66058f575e9a75ff6b8a36ba",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020661403642091",
+      "durationMs": 1
+    },
+    {
+      "traceID": "b0ec4143407e3616ea2866f606aba96b",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020656343934671",
+      "durationMs": 1
+    },
+    {
+      "traceID": "93e418f5e2f92ea18cb59c2a03f4514d",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020651282875444",
+      "durationMs": 1
+    },
+    {
+      "traceID": "11429d3e8a12b9199e2997433dfa747e",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020646224679275",
+      "durationMs": 1
+    },
+    {
+      "traceID": "6f53ed18166570882d570750546fc6f6",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020641164274334",
+      "durationMs": 1
+    },
+    {
+      "traceID": "66d92c4858df5213fc1702f61f317643",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020636105757232",
+      "durationMs": 1
+    },
+    {
+      "traceID": "4c0d9c0749a602dea23ae122eaf66044",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020631045794334",
+      "durationMs": 1
+    },
+    {
+      "traceID": "3fc116248c8d424d9401ee0a097a4012",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020625983303966",
+      "durationMs": 1
+    },
+    {
+      "traceID": "3d12d606422299af6a224db958e2e1fc",
+      "rootServiceName": "order-tracker",
+      "rootTraceName": "GET /healthz",
+      "startTimeUnixNano": "1791020620914888306",
+      "durationMs": 1
+    },
+    {
+      "
+
+Investigate the root cause in the application code, fix it, and keep the change minimal and correct. Then summarise what was wrong and what you changed. End with a single clear last line stating the outcome.

@@ -1,0 +1,57 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: order-tracker
+    folder: Order Tracker
+    interval: 10s
+    rules:
+      - uid: order-tracker-5xx
+        title: Order Tracker 5xx errors
+        condition: C
+        # 'for: 0s' means the alert fires on the first failing evaluation.
+        for: 0s
+        # No 5xx series exists until a server error happens, so the query uses
+        # 'or vector(0)' to always return a number. That keeps quiet periods at
+        # Normal instead of No Data.
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              editorMode: code
+              expr: 'sum(increase(http_server_requests_total{http_status_code=~"5.."}[5m])) or vector(0)'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        annotations:
+          summary: "Order Tracker is returning 5xx errors"
+          description: "{{ $values.B.Value }} server error(s) in the last 5m on the order lookup endpoint. Investigate immediately."
+          endpoint: "GET /api/orders/{order_id}"
+          window: "last 5m"
+          dashboard_url: "http://localhost:3001/d/order-tracker/order-tracker-requests-errors"
+        labels:
+          severity: critical
+          service: order-tracker
