@@ -63,9 +63,11 @@ def order_detail(row):
     order = as_dict(row)
     if order["priority"] == "express":
         placed_at = datetime.fromisoformat(order["created_at"])
-        # Use timedelta so the +2 days rolls over month/year boundaries.
-        # `placed_at.replace(day=placed_at.day + 2)` crashed for orders placed
-        # near month end (e.g. day 30 -> day 32 is out of range).
+        # Add days with timedelta so the estimate rolls over month/year
+        # boundaries. Do NOT use `placed_at.replace(day=placed_at.day + 2)`:
+        # it raises ValueError ("day is out of range for month") for orders
+        # placed near month end (e.g. day 30 -> day 32), which 500s the
+        # express order lookup (see incident: express-1002 5xx).
         estimated_at = placed_at + timedelta(days=2)
         order["estimated_delivery"] = estimated_at.date().isoformat()
     return order

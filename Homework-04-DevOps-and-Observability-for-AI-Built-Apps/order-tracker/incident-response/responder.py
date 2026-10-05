@@ -40,6 +40,11 @@ app = FastAPI(title="Incident Responder")
 # In-memory index of incidents handled this run.
 _incidents: dict[str, dict] = {}
 
+# Guard so a repeated/flapping alert does not launch several agents at once
+# (they would edit the same files concurrently). A real incident is skipped
+# while an agent is already running; test alerts always run.
+_agent_busy = threading.Event()
+
 
 def _now_id() -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -146,7 +151,11 @@ def _handle_incident(incident_id: str, incident: dict) -> None:
     print(f"[responder] incident {incident_id}: launching agent "
           f"({_incidents[incident_id]['agent_backend']})", flush=True)
 
-    answer = agent_runner.run_agent(prompt, incident, str(REPO_DIR))
+    _agent_busy.set()
+    try:
+        answer = agent_runner.run_agent(prompt, incident, str(REPO_DIR))
+    finally:
+        _agent_busy.clear()
 
     (inc_dir / "agent-response.txt").write_text(answer)
     last_line = next(
@@ -198,6 +207,14 @@ async def alerts(request: Request):
         inc_dir = INCIDENTS_DIR / incident_id
         inc_dir.mkdir(parents=True, exist_ok=True)
         (inc_dir / "alert.json").write_text(json.dumps(alert, indent=2))
+
+        # A real incident is skipped while an agent is already working, so a
+        # flapping alert does not spawn concurrent agents editing the same code.
+        if not is_test and _agent_busy.is_set():
+            _incidents[incident_id] = {**incident, "status": "skipped_agent_busy"}
+            handled.append(incident_id)
+            print(f"[responder] skipped incident {incident_id}: agent busy", flush=True)
+            continue
 
         _incidents[incident_id] = {**incident, "status": "accepted"}
         threading.Thread(
