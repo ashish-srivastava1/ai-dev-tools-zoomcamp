@@ -1,0 +1,18 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "http_route": "/api/orders/{order_id}",
+          "http_status_code": "500"
+        },
+        "value": [
+          1791175007.227,
+          "7"
+        ]
+      }
+    ]
+  }
+}

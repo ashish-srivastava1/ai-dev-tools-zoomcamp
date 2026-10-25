@@ -1,0 +1,29 @@
+{
+  "status": "firing",
+  "labels": {
+    "alertname": "Order Tracker 5xx errors",
+    "grafana_folder": "Order Tracker",
+    "service": "order-tracker",
+    "severity": "critical"
+  },
+  "annotations": {
+    "dashboard_url": "http://localhost:3001/d/order-tracker/order-tracker-requests-errors",
+    "description": "6.158095151015929 server error(s) in the last 5m on the order lookup endpoint. Investigate immediately.",
+    "endpoint": "GET /api/orders/{order_id}",
+    "summary": "Order Tracker is returning 5xx errors",
+    "window": "last 5m"
+  },
+  "startsAt": "2026-10-05T04:36:40Z",
+  "endsAt": "0001-01-01T00:00:00Z",
+  "generatorURL": "http://localhost:3000/alerting/grafana/order-tracker-5xx/view?orgId=1",
+  "fingerprint": "f173e6bf2b810ec6",
+  "silenceURL": "http://localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DOrder+Tracker+5xx+errors&matcher=grafana_folder%3DOrder+Tracker&matcher=service%3Dorder-tracker&matcher=severity%3Dcritical&orgId=1",
+  "dashboardURL": "",
+  "panelURL": "",
+  "values": {
+    "A": 6.158095151015929,
+    "B": 6.158095151015929,
+    "C": 1
+  },
+  "valueString": "[ var='A' labels={} value=6.158095151015929 ], [ var='B' labels={} value=6.158095151015929 ], [ var='C' labels={} value=1 ]"
+}

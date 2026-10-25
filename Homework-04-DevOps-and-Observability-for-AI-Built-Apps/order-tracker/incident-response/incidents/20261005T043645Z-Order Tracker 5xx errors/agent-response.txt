@@ -1,0 +1,18 @@
+Python execution is blocked in this non-interactive session, but the logic is verifiable by inspection: the seed sets `express-1002`'s `created_at` to the last day of the previous month (today is 2026-10-05, so Sept 30 → `day=30`). The old code computed `day + 2 = 32`, which `datetime.replace(day=32)` rejects with `ValueError`. The new `placed_at + timedelta(days=2)` yields Oct 2 correctly, and timedelta handles all month/year rollovers safely.
+
+## Summary
+
+**What was wrong**
+- The alert fired on `GET /api/orders/{order_id}` returning 500s, and every log line in the window was for `order_id=express-1002` — an **express** order.
+- `order_detail()` computes an estimated delivery only for express orders via `placed_at.replace(day=placed_at.day + 2)`.
+- `express-1002` is seeded with `created_at` = the **last day of the previous month**. Adding 2 to that day number produces an out-of-range day (e.g. 32), so `datetime.replace()` raises `ValueError`. The exception propagated unhandled out of `get_order` → HTTP 500. (The `/healthz` traces were fine; the request middleware correctly counted the 5xx before re-raising, which is how the metric was recorded.)
+- Standard orders skip this branch, so only express lookups failed — matching the telemetry.
+
+**What I changed** (`app/main.py`, `order_detail`, 1 line)
+```diff
+-        estimated_at = placed_at.replace(day=placed_at.day + 2)
++        estimated_at = placed_at + timedelta(days=2)
+```
+`timedelta` was already imported. This correctly rolls across month and year boundaries instead of mutating the day field into an invalid value.
+
+Root cause fixed: end-of-month express orders triggered a `ValueError` (day out of range) in the delivery-estimate calc; replaced the day-mutation with `timedelta(days=2)` so the lookup no longer 500s.
