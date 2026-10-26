@@ -1,0 +1,283 @@
+# LearnLoop (Project-1) - CI/CD
+#
+#   pull_request  -> backend unit + lint, integration (Postgres), frontend, contract, docker build
+#   push to main  -> all of the above -> publish image to GHCR -> deploy to DEV (automatic)
+#                 -> deploy to PRODUCTION (waits for manual approval on the `production` environment)
+#
+# Rollback: see .github/workflows/project-1-rollback.yml and Project-1/ops/rollback.md
+# One-time setup (secrets, variables, environments): Project-1/docs/deployment.md
+name: project-1-cicd
+
+on:
+  pull_request:
+    paths:
+      - 'Project-1/**'
+      - '.github/workflows/project-1-*.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Project-1/**'
+      - '.github/workflows/project-1-*.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: project-1-cicd-${{ github.ref }}
+  # Never cancel an in-flight deploy on main; do cancel superseded PR runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: learnloop
+
+jobs:
+  backend:
+    name: backend (lint + unit tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Project-1/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: Project-1/backend/uv.lock
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
+  integration:
+    name: integration tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: learnloop
+          POSTGRES_PASSWORD: learnloop
+          POSTGRES_DB: learnloop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U learnloop -d learnloop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: Project-1/backend
+    env:
+      INTEGRATION_DATABASE_URL: postgresql+psycopg://learnloop:learnloop@localhost:5432/learnloop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: Project-1/backend/uv.lock
+      - run: uv sync --frozen
+      - run: uv run pytest -m integration
+
+  frontend:
+    name: frontend (lint + tests + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Project-1/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: Project-1/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  contract:
+    name: OpenAPI contract lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Project-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npx --yes @redocly/cli@1 lint openapi.yaml
+
+  docker:
+    name: docker build (no push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: Project-1
+          file: Project-1/Dockerfile
+          push: false
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    name: publish image to GHCR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, integration, frontend, contract]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.img.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name (GHCR needs a lowercase owner)
+        id: img
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "repo=ghcr.io/${owner}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${owner}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.img.outputs.repo }}
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=raw,value=main
+          labels: |
+            org.opencontainers.image.title=LearnLoop
+            org.opencontainers.image.description=Personal learning dashboard (AI Dev Tools Zoomcamp final project)
+      - uses: docker/build-push-action@v6
+        with:
+          context: Project-1
+          file: Project-1/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Summary
+        run: |
+          echo "### Image published" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.img.outputs.image }}\` (also tagged \`main\`)" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-dev:
+    name: deploy to dev (automatic)
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ vars.DEV_URL }}
+    steps:
+      - name: Trigger Render deploy (dev)
+        id: deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_DEV }}
+          BASE_URL: ${{ vars.DEV_URL }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          if [ -z "$HOOK" ] || [ -z "$BASE_URL" ]; then
+            msg="Dev deploy SKIPPED: secret RENDER_DEPLOY_HOOK_DEV and/or variable DEV_URL not configured (see Project-1/docs/deployment.md)."
+            echo "::warning::$msg"
+            echo "### :warning: $msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          img="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$IMAGE")"
+          # Render deploy hooks for image-backed services accept imgURL=<image ref>.
+          curl -fsS -X POST "${HOOK}&imgURL=${img}" -o /dev/null
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - name: Smoke test (dev)
+        if: steps.deploy.outputs.skip != 'true'
+        env:
+          BASE_URL: ${{ vars.DEV_URL }}
+          SHA: ${{ github.sha }}
+        run: |
+          base="${BASE_URL%/}"
+          # Render keeps the old instance serving until the new one passes its
+          # health check, so give the rollout a head start before polling.
+          sleep 30
+          echo "Waiting for $base/health ..."
+          for i in $(seq 1 60); do
+            if curl -fsS "$base/health" | grep -q '"ok"'; then echo "healthy after $((i*5))s"; break; fi
+            sleep 5
+            if [ "$i" = 60 ]; then echo "::error::$base/health not healthy after 5 minutes"; exit 1; fi
+          done
+          code="$(curl -s -o /dev/null -w '%{http_code}' "$base/api/dashboard")"
+          [ "$code" = 200 ] || { echo "::error::/api/dashboard returned $code"; exit 1; }
+          {
+            echo "### Dev deployed"
+            echo "- Commit: \`$SHA\`"
+            echo "- URL: $base"
+            echo "- /health OK, /api/dashboard 200"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-prod:
+    name: deploy to production (manual approval)
+    needs: [publish, deploy-dev]
+    runs-on: ubuntu-latest
+    # The `production` environment has "Required reviewers" set, so this job
+    # pauses until a reviewer approves it in the Actions UI.
+    environment:
+      name: production
+      url: ${{ vars.PROD_URL }}
+    steps:
+      - name: Trigger Render deploy (production)
+        id: deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_PROD }}
+          BASE_URL: ${{ vars.PROD_URL }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          if [ -z "$HOOK" ] || [ -z "$BASE_URL" ]; then
+            msg="Production deploy SKIPPED: secret RENDER_DEPLOY_HOOK_PROD and/or variable PROD_URL not configured (see Project-1/docs/deployment.md)."
+            echo "::warning::$msg"
+            echo "### :warning: $msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          img="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$IMAGE")"
+          curl -fsS -X POST "${HOOK}&imgURL=${img}" -o /dev/null
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - name: Smoke test (production)
+        if: steps.deploy.outputs.skip != 'true'
+        env:
+          BASE_URL: ${{ vars.PROD_URL }}
+          SHA: ${{ github.sha }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          base="${BASE_URL%/}"
+          sleep 30
+          for i in $(seq 1 60); do
+            if curl -fsS "$base/health" | grep -q '"ok"'; then echo "healthy after $((i*5))s"; break; fi
+            sleep 5
+            if [ "$i" = 60 ]; then echo "::error::$base/health not healthy after 5 minutes"; exit 1; fi
+          done
+          code="$(curl -s -o /dev/null -w '%{http_code}' "$base/api/dashboard")"
+          [ "$code" = 200 ] || { echo "::error::/api/dashboard returned $code"; exit 1; }
+          {
+            echo "### Production deployed"
+            echo "- Commit: \`$SHA\`"
+            echo "- Image: \`$IMAGE\`"
+            echo "- URL: $base"
+            echo "- Roll back with the **project-1-rollback** workflow (see Project-1/ops/rollback.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
