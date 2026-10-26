@@ -1,0 +1,609 @@
+openapi: 3.1.0
+info:
+  title: LearnLoop API
+  version: 0.1.0
+  description: |
+    Contract for LearnLoop, a single-user learning dashboard.
+    Source of truth for behaviour: `product-spec.md` (feature IDs F1-F5, AC ids in descriptions).
+
+    **Auth:** when the server has `WRITE_TOKEN` set, every POST/PUT/PATCH/DELETE
+    needs `Authorization: Bearer <token>`; otherwise writes are open (local dev).
+    GET endpoints are always open.
+
+    **Errors:** all errors return `{ "detail": ... }`. Validation errors (422)
+    return FastAPI's list form; other errors return a string.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8000
+    description: Local (docker compose)
+tags:
+  - name: health
+    description: Liveness check
+  - name: tracks
+    description: F1 - learning tracks
+  - name: modules
+    description: F2 - modules within a track
+  - name: sessions
+    description: F3 - study sessions (key user journey)
+  - name: dashboard
+    description: F4 - progress summary (key user journey)
+  - name: settings
+    description: F5 - user settings
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Liveness and DB connectivity check
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+
+  /api/tracks:
+    get:
+      tags: [tracks]
+      operationId: listTracks
+      summary: List tracks (AC1.1)
+      security: []
+      parameters:
+        - name: include_archived
+          in: query
+          schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Tracks ordered by created_at
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Track'}
+    post:
+      tags: [tracks]
+      operationId: createTrack
+      summary: Create a track (AC1.1, AC1.2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TrackCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Track'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+
+  /api/tracks/{track_id}:
+    parameters:
+      - $ref: '#/components/parameters/TrackId'
+    get:
+      tags: [tracks]
+      operationId: getTrack
+      summary: Get one track
+      security: []
+      responses:
+        '200':
+          description: The track
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Track'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [tracks]
+      operationId: updateTrack
+      summary: Edit or archive a track (AC1.3, AC1.4)
+      description: Setting `archived` to true hides the track from the dashboard and the session form; its sessions are kept.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TrackUpdate'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Track'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+
+  /api/tracks/{track_id}/modules:
+    parameters:
+      - $ref: '#/components/parameters/TrackId'
+    get:
+      tags: [modules]
+      operationId: listModules
+      summary: List a track's modules in position order (AC2.1)
+      security: []
+      responses:
+        '200':
+          description: Modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Module'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [modules]
+      operationId: createModule
+      summary: Add a module at the end of the list (AC2.1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModuleCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Module'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+
+  /api/tracks/{track_id}/modules/order:
+    parameters:
+      - $ref: '#/components/parameters/TrackId'
+    put:
+      tags: [modules]
+      operationId: reorderModules
+      summary: Reorder modules (AC2.3)
+      description: '`module_ids` must contain every module of the track exactly once.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModuleOrder'}
+      responses:
+        '200':
+          description: Modules in the new order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Module'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+
+  /api/modules/{module_id}:
+    parameters:
+      - $ref: '#/components/parameters/ModuleId'
+    patch:
+      tags: [modules]
+      operationId: updateModule
+      summary: Rename a module or change its status (AC2.2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModuleUpdate'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Module'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    delete:
+      tags: [modules]
+      operationId: deleteModule
+      summary: Delete a module; its sessions keep module_id = null (AC2.3)
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /api/sessions:
+    get:
+      tags: [sessions]
+      operationId: listSessions
+      summary: List sessions, newest first, paginated (AC3.4)
+      security: []
+      parameters:
+        - name: track_id
+          in: query
+          schema: {type: integer, minimum: 1}
+        - name: from
+          in: query
+          description: Inclusive start date (YYYY-MM-DD)
+          schema: {type: string, format: date}
+        - name: to
+          in: query
+          description: Inclusive end date (YYYY-MM-DD)
+          schema: {type: string, format: date}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, default: 1}
+        - name: page_size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        '200':
+          description: A page of sessions ordered by date desc, then created_at desc
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SessionPage'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    post:
+      tags: [sessions]
+      operationId: createSession
+      summary: Log a study session - key user journey (AC3.1, AC3.2)
+      description: |
+        Validation (422): minutes 1-600; date not after "today" in the user's
+        timezone (settings); track exists and is not archived; module, if
+        given, belongs to the track.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SessionCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+
+  /api/sessions/{session_id}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [sessions]
+      operationId: getSession
+      summary: Get one session
+      security: []
+      responses:
+        '200':
+          description: The session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [sessions]
+      operationId: updateSession
+      summary: Edit a session (AC3.3); same validation as create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SessionUpdate'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    delete:
+      tags: [sessions]
+      operationId: deleteSession
+      summary: Delete a session (AC3.3)
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /api/dashboard:
+    get:
+      tags: [dashboard]
+      operationId: getDashboard
+      summary: Progress summary - key user journey (AC4.1-AC4.6)
+      description: All date maths uses the timezone and week_start from settings. Archived tracks are excluded.
+      security: []
+      responses:
+        '200':
+          description: Dashboard
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Dashboard'}
+
+  /api/settings:
+    get:
+      tags: [settings]
+      operationId: getSettings
+      summary: Get settings (AC5.1)
+      security: []
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Settings'}
+    put:
+      tags: [settings]
+      operationId: updateSettings
+      summary: Replace settings (AC5.1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Settings'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Settings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Value of the server's WRITE_TOKEN. Only enforced when WRITE_TOKEN is set.
+
+  parameters:
+    TrackId:
+      name: track_id
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    ModuleId:
+      name: module_id
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unauthorized:
+      description: Missing or wrong bearer token (only when WRITE_TOKEN is set)
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                properties:
+                  loc:
+                    type: array
+                    items:
+                      oneOf: [{type: string}, {type: integer}]
+                  msg: {type: string}
+                  type: {type: string}
+
+    HexColor:
+      type: string
+      pattern: '^#[0-9a-fA-F]{6}$'
+      examples: ['#4f46e5']
+
+    Track:
+      type: object
+      required: [id, name, description, target_hours, color, archived, created_at]
+      properties:
+        id: {type: integer}
+        name: {type: string, minLength: 1, maxLength: 80}
+        description: {type: [string, 'null'], maxLength: 500}
+        target_hours: {type: number, exclusiveMinimum: 0}
+        color: {$ref: '#/components/schemas/HexColor'}
+        archived: {type: boolean}
+        created_at: {type: string, format: date-time}
+    TrackCreate:
+      type: object
+      required: [name, target_hours]
+      description: Name must be unique, case-insensitively (AC1.2).
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        description: {type: [string, 'null'], maxLength: 500}
+        target_hours: {type: number, exclusiveMinimum: 0}
+        color:
+          allOf: [{$ref: '#/components/schemas/HexColor'}]
+          default: '#4f46e5'
+    TrackUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        description: {type: [string, 'null'], maxLength: 500}
+        target_hours: {type: number, exclusiveMinimum: 0}
+        color: {$ref: '#/components/schemas/HexColor'}
+        archived: {type: boolean}
+
+    ModuleStatus:
+      type: string
+      enum: [not_started, in_progress, done]
+    Module:
+      type: object
+      required: [id, track_id, title, position, status]
+      properties:
+        id: {type: integer}
+        track_id: {type: integer}
+        title: {type: string, minLength: 1, maxLength: 120}
+        position: {type: integer, minimum: 0}
+        status: {$ref: '#/components/schemas/ModuleStatus'}
+    ModuleCreate:
+      type: object
+      required: [title]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 120}
+        status:
+          allOf: [{$ref: '#/components/schemas/ModuleStatus'}]
+          default: not_started
+    ModuleUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        title: {type: string, minLength: 1, maxLength: 120}
+        status: {$ref: '#/components/schemas/ModuleStatus'}
+    ModuleOrder:
+      type: object
+      required: [module_ids]
+      properties:
+        module_ids:
+          type: array
+          uniqueItems: true
+          items: {type: integer}
+
+    Session:
+      type: object
+      required: [id, track_id, module_id, date, minutes, topic, notes, created_at]
+      properties:
+        id: {type: integer}
+        track_id: {type: integer}
+        module_id: {type: [integer, 'null']}
+        date: {type: string, format: date}
+        minutes: {type: integer, minimum: 1, maximum: 600}
+        topic: {type: string, minLength: 1, maxLength: 120}
+        notes: {type: [string, 'null'], maxLength: 2000}
+        created_at: {type: string, format: date-time}
+    SessionCreate:
+      type: object
+      required: [track_id, date, minutes, topic]
+      properties:
+        track_id: {type: integer}
+        module_id: {type: [integer, 'null']}
+        date: {type: string, format: date}
+        minutes: {type: integer, minimum: 1, maximum: 600}
+        topic: {type: string, minLength: 1, maxLength: 120}
+        notes: {type: [string, 'null'], maxLength: 2000}
+    SessionUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        track_id: {type: integer}
+        module_id: {type: [integer, 'null']}
+        date: {type: string, format: date}
+        minutes: {type: integer, minimum: 1, maximum: 600}
+        topic: {type: string, minLength: 1, maxLength: 120}
+        notes: {type: [string, 'null'], maxLength: 2000}
+    SessionPage:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Session'}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1}
+
+    Dashboard:
+      type: object
+      required: [empty, today, timezone, week, streak, tracks, weekly_trend, recent_sessions]
+      properties:
+        empty:
+          type: boolean
+          description: True when there are no active tracks (AC4.6)
+        today:
+          type: string
+          format: date
+          description: Today's date in the user's timezone
+        timezone: {type: string, examples: [Asia/Kolkata]}
+        week:
+          type: object
+          description: AC4.1
+          required: [start, hours, goal_hours, percent]
+          properties:
+            start: {type: string, format: date}
+            hours: {type: number, minimum: 0}
+            goal_hours: {type: number, exclusiveMinimum: 0}
+            percent:
+              type: integer
+              minimum: 0
+              description: Rounded; may exceed 100
+        streak:
+          type: object
+          description: AC4.2 - consecutive days with >= 1 session
+          required: [current_days, longest_days]
+          properties:
+            current_days: {type: integer, minimum: 0}
+            longest_days: {type: integer, minimum: 0}
+        tracks:
+          type: array
+          description: AC4.3 - active tracks only
+          items:
+            type: object
+            required: [track_id, name, color, hours, target_hours, target_percent, module_count, completion_percent]
+            properties:
+              track_id: {type: integer}
+              name: {type: string}
+              color: {$ref: '#/components/schemas/HexColor'}
+              hours: {type: number, minimum: 0}
+              target_hours: {type: number}
+              target_percent: {type: integer, minimum: 0}
+              module_count: {type: integer, minimum: 0}
+              completion_percent: {type: integer, minimum: 0, maximum: 100}
+        weekly_trend:
+          type: array
+          description: AC4.4 - exactly 8 entries, oldest first, ending with the current week
+          minItems: 8
+          maxItems: 8
+          items:
+            type: object
+            required: [week_start, hours]
+            properties:
+              week_start: {type: string, format: date}
+              hours: {type: number, minimum: 0}
+        recent_sessions:
+          type: array
+          description: AC4.5 - up to 5, newest first
+          maxItems: 5
+          items: {$ref: '#/components/schemas/Session'}
+
+    Settings:
+      type: object
+      required: [weekly_goal_hours, timezone, week_start]
+      properties:
+        weekly_goal_hours: {type: number, exclusiveMinimum: 0, maximum: 168, default: 5}
+        timezone:
+          type: string
+          description: IANA timezone name
+          default: Asia/Kolkata
+        week_start:
+          type: string
+          enum: [monday, sunday]
+          default: monday
