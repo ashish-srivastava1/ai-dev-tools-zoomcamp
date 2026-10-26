@@ -1,0 +1,33 @@
+# One command runs every test (backend lint + unit, integration on Postgres, frontend lint + tests):
+#
+#   docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+#
+# (or: make test   /   .\scripts\test.ps1   /   ./scripts/test.sh)
+name: learnloop-test
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: learnloop
+      POSTGRES_PASSWORD: learnloop
+      POSTGRES_DB: learnloop_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learnloop -d learnloop_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  tests:
+    build:
+      context: .
+      target: test
+    environment:
+      INTEGRATION_DATABASE_URL: postgresql+psycopg://learnloop:learnloop@db:5432/learnloop_test
+      TELEMETRY_EXPORTER: none
+      CI: "true"
+    depends_on:
+      db:
+        condition: service_healthy
