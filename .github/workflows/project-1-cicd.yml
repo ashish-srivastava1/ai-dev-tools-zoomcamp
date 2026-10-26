@@ -124,6 +124,7 @@ jobs:
         with:
           context: Project-1
           file: Project-1/Dockerfile
+          target: runtime
           push: false
           build-args: |
             APP_VERSION=${{ github.sha }}
@@ -168,6 +169,7 @@ jobs:
         with:
           context: Project-1
           file: Project-1/Dockerfile
+          target: runtime
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -21,7 +21,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U learnloop -d learnloop"]
       interval: 5s
@@ -32,11 +32,12 @@ services:
   app:
     build:
       context: .
+      target: runtime   # the Dockerfile's last stage is `test`; always build the app image
       args:
         APP_VERSION: ${APP_VERSION:-local}
     image: learnloop:${APP_VERSION:-local}
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     environment:
       PORT: "8000"
       APP_ENV: local
@@ -73,7 +74,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.enable-lifecycle"
     ports:
-      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./ops/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus:/prometheus
@@ -83,7 +84,7 @@ services:
     image: grafana/loki:3.3.2
     command: ["-config.file=/etc/loki/local-config.yaml"]
     ports:
-      - "127.0.0.1:3100:3100"
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
     volumes:
       - ./ops/observability/loki-config.yaml:/etc/loki/local-config.yaml:ro
       - loki:/loki
@@ -93,7 +94,7 @@ services:
     image: grafana/tempo:2.7.1
     command: ["-config.file=/etc/tempo.yaml"]
     ports:
-      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:${TEMPO_PORT:-3200}:3200"
     volumes:
       - ./ops/observability/tempo-config.yaml:/etc/tempo.yaml:ro
       - tempo:/var/tempo
