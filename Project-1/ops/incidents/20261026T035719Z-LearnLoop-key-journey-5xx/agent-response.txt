@@ -1,0 +1,10 @@
+`GET /api/dashboard` was returning 500 because `logic.completion_percent` divided by zero for any active track with no modules. I fixed it in `backend/src/learnloop/logic.py`. `uv run pytest -q` now passes (74 passed), but I haven't rebuilt or redeployed the app, so the alert has not been seen to resolve.
+
+- **Evidence:** About 83% of dashboard requests were returning 500. `POST /api/sessions` was healthy and latency was normal. Loki and Tempo were unreachable (connection refused), so I found the cause by reading the code and reproducing it with tests, not from a stack trace.
+- **Fix:** `completion_percent` now calls the existing `percent()` helper, which returns 0 when the total is 0. That matches AC2.2 (completion is 0 when a track has no modules). The error isn't swallowed, and validation and the API contract are unchanged.
+- **Tests:** I added no new test, because `test_completion_percent_zero_modules_is_zero` and `test_completion_percent_never_divides_by_zero` in `backend/tests/unit/test_logic.py` already covered the case. Before the fix, 13 tests failed with `ZeroDivisionError`: those two plus 11 other tests that call the dashboard. All pass now.
+- **Git:** Git is disabled, so I made no branch, commit, issue or PR. The change is in the working tree for the lead to review.
+- **Write-up:** The "## Agent findings" section of `ops/incidents/20261026T035719Z-LearnLoop-key-journey-5xx/incident.md` covers symptom, root cause, fix, tests and how to verify. It notes that Loki and Tempo being unreachable needs a separate follow-up.
+- **To verify:** Rebuild and redeploy the app, load the dashboard with a track that has no modules, and log a session. The 5xx ratio on `/api/dashboard` should drop to 0 and the alert should return to Normal.
+
+Fixed: `completion_percent` no longer raises `ZeroDivisionError` for tracks with no modules, which was causing the `/api/dashboard` 500s. The fix is uncommitted in the working tree and needs a rebuild to confirm the alert clears.

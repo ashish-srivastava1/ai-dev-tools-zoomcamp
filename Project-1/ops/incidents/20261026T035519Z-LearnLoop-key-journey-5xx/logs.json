@@ -1,0 +1,4 @@
+{
+  "query": "{service_name=\"learnloop\"} | severity_text=~\"(?i)error|critical|fatal\"",
+  "error": "[Errno 111] Connection refused"
+}

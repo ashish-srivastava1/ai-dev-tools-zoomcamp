@@ -1,0 +1,87 @@
+You are the LearnLoop on-call agent running in headless mode.
+Repository (Project-1 of the course repo): /home/claude/repo/Project-1
+
+A Grafana alert just FIRED - real users are affected.
+- Alert: LearnLoop key journey 5xx (severity: critical)
+- Affected endpoint: POST /api/sessions, GET /api/dashboard
+- Window: last 5m
+- Summary: Key journey failing
+- Description: 38% of requests 5xx
+- Dashboard: http://localhost:3001/d/learnloop
+- Runbook: ops/runbook.md#key-journey-5xx
+- Started at: None
+
+Evidence gathered from telemetry (also saved under ops/incidents/20261026T035519Z-LearnLoop-key-journey-5xx/):
+METRICS (5xx by route, p95 latency):
+{
+  "error_5xx_by_route_5m": [
+    {
+      "labels": {
+        "http_method": "GET",
+        "http_route": "/api/dashboard",
+        "http_status_code": "500"
+      },
+      "value": "29.6224"
+    }
+  ],
+  "error_ratio_by_route_5m": [
+    {
+      "labels": {
+        "http_route": "/api/dashboard"
+      },
+      "value": "0.7525306627967625"
+    }
+  ],
+  "p95_latency_seconds_by_route_5m": [
+    {
+      "labels": {
+        "http_route": "/api/sessions"
+      },
+      "value": "0.02465281448657359"
+    },
+    {
+      "labels": {
+        "http_route": "/health"
+      },
+      "value": "NaN"
+    },
+    {
+      "labels": {
+        "http_route": "/api/dashboard"
+      },
+      "value": "0.024134228715373574"
+    },
+    {
+      "labels": {
+        "http_route": "/api/tracks"
+      },
+      "value": "NaN"
+    }
+  ]
+}
+
+ERROR LOGS (Loki, newest first):
+{
+  "query": "{service_name=\"learnloop\"} | severity_text=~\"(?i)error|critical|fatal\"",
+  "error": "[Errno 111] Connection refused"
+}
+
+ERROR TRACES (Tempo):
+{
+  "query": "{ resource.service.name = \"learnloop\" && status = error }",
+  "error": "[Errno 111] Connection refused"
+}
+
+Do this, in order:
+1. Read AGENTS.md and ops/runbook.md. Follow their rules (no PII in logs, uv only, tests first).
+2. Find the root cause in backend/src/learnloop/ using the stack trace / error logs above.
+3. Reproduce it first: add a failing unit test under backend/tests/unit/ that captures the bug.
+4. Fix the root cause with the smallest correct change (do not just catch-and-hide the error,
+   do not weaken validation, do not change the API contract).
+5. Run `uv run pytest -q` in backend/ and make sure everything passes.
+6. Git is DISABLED (ONCALL_GIT is not 1): do NOT create branches, commits, issues or PRs.
+   Leave the fix in the working tree for the human lead to review.
+7. Write ops/incidents/20261026T035519Z-LearnLoop-key-journey-5xx/incident.md "## Agent findings" section: symptom, root cause,
+   fix, test added, how to verify (rebuild the app and watch the alert resolve).
+
+End your answer with a single clear last line stating the outcome (e.g. "Fixed: ...").
