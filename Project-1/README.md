@@ -7,7 +7,7 @@ LearnLoop is one small full-stack app taken all the way to production: spec → 
 
 ## Problem
 
-Working professionals who are upskilling, for example an engineering manager doing an AI programme alongside a part-time course, learn in short sessions spread over months. They use several sources (courses, books, side projects), and it is hard to answer simple questions about their own progress:
+Software professionals who are upskilling, for example someone taking an AI course alongside a full-time job, learn in short sessions spread over months. They use several sources (courses, books, side projects), and it is hard to answer simple questions about their own progress:
 
 - How many hours did I put in this week, and is that on target?
 - Which track am I neglecting?
