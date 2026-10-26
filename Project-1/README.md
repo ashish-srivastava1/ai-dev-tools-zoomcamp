@@ -114,8 +114,10 @@ docker compose -f docker-compose.test.yml up --build --abort-on-container-exit -
 
 | Environment | URL |
 |---|---|
-| dev | _add after first deploy_ |
-| prod | _add after first deploy_ |
+| dev | https://learnloop-dev.onrender.com (open for reviewers: you can add tracks and sessions) |
+| prod | https://learnloop-prod.onrender.com (read-only for visitors: writes need the owner's `WRITE_TOKEN`) |
+
+Both run on Render's free tier, which sleeps after about 15 minutes idle. The first request after a pause can take 30–60 seconds while the service wakes up. The data lives in Neon Postgres (one branch per environment), so it survives restarts and redeploys.
 
 One-time setup (Render services, databases, secrets, environments): [`docs/deployment.md`](docs/deployment.md).
 
@@ -153,7 +155,7 @@ One-time setup (Render services, databases, secrets, environments): [`docs/deplo
 | Application | `docker compose up --build` → UI + API + Postgres |
 | Testing | Unit + integration + frontend tests, one command (see [Tests](#tests)) |
 | Containerization | [`Dockerfile`](Dockerfile), [`docker-compose.yml`](docker-compose.yml) (db included) |
-| Deployment | Render dev + prod (URLs above), [`docs/deployment.md`](docs/deployment.md) |
+| Deployment | https://learnloop-dev.onrender.com and https://learnloop-prod.onrender.com (Render + Neon Postgres), [`docs/deployment.md`](docs/deployment.md) |
 | CI/CD | [`project-1-cicd.yml`](../.github/workflows/project-1-cicd.yml): PR tests → auto dev → manual prod; [`project-1-rollback.yml`](../.github/workflows/project-1-rollback.yml) |
 | Observability | [`backend/src/learnloop/telemetry.py`](backend/src/learnloop/telemetry.py), [`ops/observability/`](ops/observability/) |
 | Alerting on user impact | [`alert-rules.yaml`](ops/observability/grafana/provisioning/alerting/alert-rules.yaml) |
