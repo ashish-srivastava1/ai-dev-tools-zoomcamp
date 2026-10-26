@@ -1,0 +1,8 @@
+# Lint config for openapi.yaml:  npx @redocly/cli@1 lint openapi.yaml
+extends:
+  - recommended
+rules:
+  # Read-only list/health/dashboard GETs have no meaningful 4xx case.
+  operation-4xx-response: off
+  # Local server URL is intentional; dev/prod URLs are added once deployed.
+  no-server-example.com: off
