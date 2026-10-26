@@ -1,0 +1,112 @@
+# Alerts on USER IMPACT for the key journey (spec section 7):
+#   log a session (POST /api/sessions) -> dashboard reloads (GET /api/dashboard).
+# No CPU / memory alerts on purpose.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: learnloop-key-journey
+    folder: LearnLoop
+    interval: 10s
+    rules:
+      # ---------------------------------------------------------------
+      - uid: learnloop-journey-5xx
+        title: LearnLoop key journey 5xx
+        condition: C
+        # Fire on the first failing evaluation - quick feedback for the on-call demo.
+        for: 0s
+        # Quiet periods (no traffic / no 5xx series yet) read as Normal, not No Data.
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              editorMode: code
+              # Error ratio over 5m, but only when at least one request failed, so a
+              # single error in a low-traffic demo still pages. 0 otherwise.
+              expr: |
+                (
+                  (
+                    sum(increase(learnloop_http_requests_total{http_route=~"/api/sessions|/api/dashboard", http_status_code=~"5.."}[5m]))
+                    /
+                    clamp_min(sum(increase(learnloop_http_requests_total{http_route=~"/api/sessions|/api/dashboard"}[5m])), 1)
+                  ) > 0.05
+                  and
+                  sum(increase(learnloop_http_requests_total{http_route=~"/api/sessions|/api/dashboard", http_status_code=~"5.."}[5m])) >= 1
+                ) or vector(0)
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model: {refId: B, type: reduce, reducer: last, expression: A}
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        annotations:
+          summary: "LearnLoop key journey is failing with 5xx errors"
+          description: "{{ humanizePercentage $values.B.Value }} of key-journey requests (POST /api/sessions, GET /api/dashboard) returned 5xx in the last 5m. Users cannot log sessions or see their dashboard."
+          endpoint: "POST /api/sessions, GET /api/dashboard"
+          window: "last 5m"
+          dashboard_url: "http://localhost:3001/d/learnloop/learnloop-key-journey"
+          runbook_url: "ops/runbook.md#key-journey-5xx"
+        labels:
+          service: learnloop
+          severity: critical
+          journey: log-session
+
+      # ---------------------------------------------------------------
+      - uid: learnloop-journey-latency
+        title: LearnLoop key journey latency
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              editorMode: code
+              # p95 latency of the key journey in seconds; 0 when there is no traffic
+              # (NaN > 1 is false, so `or vector(0)` takes over).
+              expr: |
+                (
+                  histogram_quantile(0.95,
+                    sum by (le) (rate(learnloop_http_request_duration_seconds_bucket{http_route=~"/api/sessions|/api/dashboard"}[5m]))
+                  ) > 1
+                ) or vector(0)
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model: {refId: B, type: reduce, reducer: last, expression: A}
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        annotations:
+          summary: "LearnLoop key journey is slow (p95 > 1s)"
+          description: "p95 latency of POST /api/sessions + GET /api/dashboard is {{ humanize $values.B.Value }}s over the last 5m (SLO: p95 < 500ms, page at > 1s)."
+          endpoint: "POST /api/sessions, GET /api/dashboard"
+          window: "last 5m"
+          dashboard_url: "http://localhost:3001/d/learnloop/learnloop-key-journey"
+          runbook_url: "ops/runbook.md#key-journey-latency"
+        labels:
+          service: learnloop
+          severity: warning
+          journey: log-session
