@@ -1,0 +1,60 @@
+# Production stack for the AWS EC2 deployment (driven by the CloudFormation
+# template's UserData). Adds Caddy in front of the same app + Postgres services
+# from the root docker-compose.yml. Only Caddy is exposed to the internet; the
+# app is reached over the private compose network.
+#
+# Reads POSTGRES_PASSWORD and SITE_ADDRESS from the .env file the instance
+# writes. Run from this directory:
+#
+#   docker compose -f compose.prod.yml up -d --build
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # A bare domain => Caddy gets a Let's Encrypt cert (HTTPS); ":80" => HTTP.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    build:
+      # Repo layout: this file is at .../deploy/aws, the Dockerfile two levels up.
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+      DATABASE_URL: "postgresql+psycopg://tableturn:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/tableturn"
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"   # internal only — Caddy proxies to it, not published to the host
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tableturn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: tableturn
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tableturn -d tableturn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

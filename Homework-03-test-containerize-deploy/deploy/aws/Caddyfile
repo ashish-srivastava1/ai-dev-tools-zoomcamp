@@ -1,0 +1,9 @@
+# Caddy reverse proxy. SITE_ADDRESS comes from the environment:
+#   - a bare domain (e.g. tableturn.example.com) => automatic HTTPS via Let's Encrypt
+#   - ":80" (the default)                         => plain HTTP
+# Everything is proxied to the app container, which serves both the API and the
+# built SPA on one origin.
+{$SITE_ADDRESS::80} {
+	encode gzip
+	reverse_proxy app:8000
+}

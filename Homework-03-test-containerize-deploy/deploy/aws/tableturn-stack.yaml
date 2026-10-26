@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  TableTurn — single-EC2 deployment. One instance runs Caddy (reverse proxy /
+  optional HTTPS), the app, and Postgres via docker compose (see
+  deploy/aws/compose.prod.yml). Self-contained: creates its own VPC, public
+  subnet, security group, and an Elastic IP so the address is stable.
+
+Parameters:
+  PostgresPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Password for the Postgres 'tableturn' user. Avoid quotes/spaces.
+
+  DomainName:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. A domain you point at this instance's Elastic IP (an A record).
+      When set, Caddy obtains a Let's Encrypt certificate and serves HTTPS.
+      Leave blank to serve plain HTTP on port 80.
+
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t3.medium, t3.large]
+    Description: t3.small (2 GiB) is enough; bump to t3.medium if the on-instance frontend build is slow.
+
+  KeyName:
+    Type: String
+    Default: ""
+    Description: >
+      Optional EC2 key pair name for SSH. Leave blank to rely on SSM Session
+      Manager instead (no open SSH port, no key needed).
+
+  SSHLocation:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: CIDR allowed to reach SSH (port 22). Only used when KeyName is set; restrict to your IP.
+
+  RepoUrl:
+    Type: String
+    Default: "https://github.com/ashish-srivastava1/ai-dev-tools-zoomcamp.git"
+    Description: Public git repo the instance clones to build and run the app.
+
+  GitRef:
+    Type: String
+    Default: "main"
+    Description: Branch or tag to deploy. Must contain BOTH the app and deploy/aws/ files.
+
+  LatestAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Resolved at deploy time to the latest Amazon Linux 2023 AMI (x86_64).
+
+Conditions:
+  HasKeyName: !Not [!Equals [!Ref KeyName, ""]]
+  HasDomain: !Not [!Equals [!Ref DomainName, ""]]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-vpc" }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-igw" }
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-public" }
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-rt" }
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TableTurn — HTTP/HTTPS from anywhere; SSH only if a key is used.
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS }
+        - !If
+          - HasKeyName
+          - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref SSHLocation, Description: SSH }
+          - !Ref "AWS::NoValue"
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-sg" }
+
+  # Role so we can connect via SSM Session Manager without SSH keys.
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestAmiId
+      IamInstanceProfile: !Ref InstanceProfile
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref "AWS::NoValue"]
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds: [!Ref SecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 20, VolumeType: gp3, DeleteOnTermination: true }
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}" }
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euxo pipefail
+            exec > >(tee /var/log/tableturn-bootstrap.log) 2>&1
+
+            # --- packages ---
+            dnf update -y
+            dnf install -y docker git
+
+            # docker compose plugin (not bundled on Amazon Linux 2023)
+            install -d /usr/libexec/docker/cli-plugins
+            curl -SL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 \
+              -o /usr/libexec/docker/cli-plugins/docker-compose
+            chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+            systemctl enable --now docker
+
+            # swap, so the on-instance frontend (npm) build doesn't OOM on small instances
+            if [ ! -f /swapfile ]; then
+              fallocate -l 2G /swapfile
+              chmod 600 /swapfile
+              mkswap /swapfile
+              swapon /swapfile
+              echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            fi
+
+            # --- app ---
+            git clone --depth 1 --branch ${GitRef} ${RepoUrl} /opt/app
+            cd /opt/app/Homework-03-test-containerize-deploy/deploy/aws
+
+            cat > .env <<ENVEOF
+            POSTGRES_PASSWORD='${PostgresPassword}'
+            SITE_ADDRESS=${SiteAddress}
+            ENVEOF
+            chmod 600 .env
+
+            docker compose -f compose.prod.yml up -d --build
+          - SiteAddress: !If [HasDomain, !Ref DomainName, ":80"]
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Instance
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-eip" }
+
+Outputs:
+  PublicIP:
+    Description: Elastic IP of the instance (point your domain's A record here).
+    Value: !Ref ElasticIP
+  URL:
+    Description: Where the app is served.
+    Value: !If
+      - HasDomain
+      - !Sub "https://${DomainName}"
+      - !Sub "http://${ElasticIP}"
+  SSMConnect:
+    Description: Open a shell without SSH (needs the AWS CLI + Session Manager plugin).
+    Value: !Sub "aws ssm start-session --target ${Instance} --region ${AWS::Region}"
+  BootstrapLog:
+    Description: Where cloud-init writes the setup log on the instance.
+    Value: /var/log/tableturn-bootstrap.log
