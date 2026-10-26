@@ -25,4 +25,42 @@ writes back to it.
 4. The lead approves promotion to prod.
 5. In production, an alert wakes the On-call agent. It opens a `type:bug` issue and a fix PR, and the change goes through the same review and CD path.
 
-Role prompts will live in `.claude/agents/` (one file per role) and be referenced here.
+## Role definitions
+
+Each role is a Claude Code subagent in [`.claude/agents/`](../.claude/agents/). The file's
+frontmatter sets the name, the description (when to use it) and the allowed tools. The body
+sets responsibilities, inputs, handoff and the shared rules.
+
+| Role | File | Tools |
+|---|---|---|
+| Product agent | [`.claude/agents/product.md`](../.claude/agents/product.md) | read/write |
+| Planner agent | [`.claude/agents/planner.md`](../.claude/agents/planner.md) | read + `gh` |
+| Backend agent | [`.claude/agents/backend.md`](../.claude/agents/backend.md) | read/write + shell |
+| Frontend agent | [`.claude/agents/frontend.md`](../.claude/agents/frontend.md) | read/write + shell |
+| Test agent | [`.claude/agents/tester.md`](../.claude/agents/tester.md) | read/write + shell |
+| Reviewer agent | [`.claude/agents/reviewer.md`](../.claude/agents/reviewer.md) | **read-only** (Read, Grep, Glob, Bash for `git diff` / `gh pr diff`) |
+| DevOps agent | [`.claude/agents/devops.md`](../.claude/agents/devops.md) | read/write + shell |
+| On-call agent | [`.claude/agents/oncall.md`](../.claude/agents/oncall.md) | read/write + shell; started headless by [`ops/oncall/responder.py`](../ops/oncall/README.md) |
+
+## Example run
+
+How the lead drives one issue, for example **#8, Sessions API (F3)**, from `Project-1/`:
+
+1. `claude --agent planner`: "check #8 is Ready and its dependencies (#4, #5) are done."
+2. `claude --agent backend`: "implement #8." The agent comments on #8, branches
+   `feat/8-sessions-api`, writes the AC3.x tests, implements, runs `uv run pytest`, and opens
+   a PR with `Closes #8`.
+   Inside a normal Claude Code session you can say instead: *"use the backend subagent for
+   issue #8"*.
+3. `claude --agent tester`: "verify PR for #8." It adds gap tests and posts an AC checklist
+   comment.
+4. `claude --agent reviewer`: "review PR for #8." It is read-only and either approves or
+   requests changes.
+5. The lead merges. CD deploys to **dev**; the lead approves **prod**.
+6. If an alert fires later, Grafana posts to the responder, which runs the **oncall** agent
+   headless (`claude -p ... --permission-mode acceptEdits`). The agent opens a `type:bug`
+   issue and a fix PR, and the same review and CD path follows.
+
+Independent roles can run at the same time on separate issues, for example backend on #8
+while frontend works on #13 against the agreed contract. The contract and the issue are
+what keep them in sync.
