@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # LearnLoop metrics, re-exported by the collector in Prometheus format.
+  - job_name: learnloop
+    static_configs:
+      - targets: ["otel-collector:8889"]
+  # The collector's own metrics.
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]
