@@ -35,6 +35,8 @@ Browser ──► FastAPI (/api/*, static UI) ──► PostgreSQL
 
 Configuration comes only from environment variables (`DATABASE_URL`, `WRITE_TOKEN`, `OTEL_*`, `APP_ENV`).
 
-## Open decisions
-- Managed Postgres: one Render DB per env, or Neon with dev/prod branches.
-- Deployed telemetry backend: Grafana Cloud free tier, or a demo that runs locally only.
+## Decisions
+- **Hosting:** two Render web services (`learnloop-dev`, `learnloop-prod`) that run the image from GHCR. The deploy hook is triggered by GitHub Actions (see `docs/deployment.md`).
+- **Database:** one managed Postgres per environment (Neon free tier recommended, or Render Postgres). The schema is created additively on startup.
+- **Telemetry:** the full Grafana stack runs locally in docker compose and is where the observability evidence is shown. Deployed services default to `TELEMETRY_EXPORTER=none` and can ship OTLP to a collector or Grafana Cloud.
+- **On-call agent:** runs on the developer's machine next to the compose stack (Grafana → `host.docker.internal:8001/alerts`) and drives Claude Code headless.
