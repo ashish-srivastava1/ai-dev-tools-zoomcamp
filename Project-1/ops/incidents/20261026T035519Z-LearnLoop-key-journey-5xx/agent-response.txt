@@ -1,0 +1,12 @@
+I fixed the dashboard crash in the working tree, but I couldn't run `uv run pytest -q`. The headless session blocked it for approval, so neither the failing-first run nor the final pass has happened.
+
+- **Symptom:** only `GET /api/dashboard` was returning 500, on about 75% of requests. Latency was normal and `/api/sessions` showed no 5xx series. Loki and Tempo refused connections, so I had no stack trace and diagnosed from the runbook's "500 on /api/dashboard only" pattern plus the code.
+- **Root cause:** `completion_percent` in `backend/src/learnloop/logic.py` divided by the track's module count with no zero check. Its docstring says it returns 0 for a track with no modules, but it raised `ZeroDivisionError` instead. The dashboard calls it for every active track, so one track with no modules breaks the whole page.
+- **Fix:** I added `if total <= 0: return 0` to `completion_percent`, the same guard `percent()` already uses. Validation and the API contract are unchanged, and nothing is caught and hidden.
+- **Test:** I added `test_completion_percent_never_divides_by_zero` in `backend/tests/unit/test_logic.py`. Two tests that already existed, `test_completion_percent_zero_modules_is_zero` and `test_completion_zero_when_no_modules`, also cover this case.
+- **Incident notes:** the "Agent findings" section is written in `ops/incidents/20261026T035519Z-LearnLoop-key-journey-5xx/incident.md`, including the verification steps (rebuild, watch the alert resolve).
+- **Git:** git was disabled, so there are no branches, commits, issues or PRs.
+
+Please run `cd backend && uv run pytest -q`, then rebuild the app and watch the 5xx ratio on the Grafana dashboard fall and the alert return to Normal.
+
+Fixed (pending verification): `completion_percent` raised `ZeroDivisionError` for tracks with no modules, which caused the 500s on `GET /api/dashboard`; I patched it in the working tree, but the test run still needs your approval.

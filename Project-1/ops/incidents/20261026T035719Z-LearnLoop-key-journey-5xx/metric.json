@@ -1,0 +1,46 @@
+{
+  "error_5xx_by_route_5m": [
+    {
+      "labels": {
+        "http_method": "GET",
+        "http_route": "/api/dashboard",
+        "http_status_code": "500"
+      },
+      "value": "45.17184"
+    }
+  ],
+  "error_ratio_by_route_5m": [
+    {
+      "labels": {
+        "http_route": "/api/dashboard"
+      },
+      "value": "0.8289223535382496"
+    }
+  ],
+  "p95_latency_seconds_by_route_5m": [
+    {
+      "labels": {
+        "http_route": "/api/sessions"
+      },
+      "value": "0.024549412200572163"
+    },
+    {
+      "labels": {
+        "http_route": "/health"
+      },
+      "value": "NaN"
+    },
+    {
+      "labels": {
+        "http_route": "/api/dashboard"
+      },
+      "value": "0.02415263880748569"
+    },
+    {
+      "labels": {
+        "http_route": "/api/tracks"
+      },
+      "value": "NaN"
+    }
+  ]
+}

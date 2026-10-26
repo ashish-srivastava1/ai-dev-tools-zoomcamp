@@ -1,0 +1,4 @@
+{
+  "query": "{ resource.service.name = \"learnloop\" && status = error }",
+  "error": "[Errno 111] Connection refused"
+}

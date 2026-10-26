@@ -1,0 +1,22 @@
+{
+  "status": "firing",
+  "alertname": "LearnLoop key journey 5xx",
+  "labels": {
+    "alertname": "LearnLoop key journey 5xx",
+    "service": "learnloop",
+    "severity": "critical",
+    "journey": "log-session"
+  },
+  "annotations": {
+    "summary": "LearnLoop key journey is failing for users",
+    "description": "More than 5% of POST /api/sessions + GET /api/dashboard requests returned 5xx",
+    "endpoint": "POST /api/sessions, GET /api/dashboard",
+    "window": "last 5m",
+    "dashboard_url": "http://localhost:3001/d/learnloop/learnloop-key-journey",
+    "runbook_url": "ops/runbook.md#key-journey-5xx"
+  },
+  "fingerprint": "def2",
+  "starts_at": null,
+  "ends_at": null,
+  "is_test": false
+}

@@ -1,0 +1,131 @@
+# LearnLoop - full local stack with ONE command:
+#
+#   docker compose up --build
+#
+#   App + API ......... http://localhost:8000        (API docs: /docs)
+#   Grafana ........... http://localhost:3001        (admin / admin; anonymous viewer)
+#   Prometheus ........ http://localhost:9090
+#
+# Services: Postgres, the app (FastAPI serving the built UI), and the observability
+# stack: OTel Collector -> Prometheus (metrics) / Tempo (traces) / Loki (logs) -> Grafana.
+# Grafana alerts post to the on-call responder on the host (ops/oncall, port 8001).
+name: learnloop
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: learnloop
+      POSTGRES_PASSWORD: learnloop
+      POSTGRES_DB: learnloop
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learnloop -d learnloop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      target: runtime   # the Dockerfile's last stage is `test`; always build the app image
+      args:
+        APP_VERSION: ${APP_VERSION:-local}
+    image: learnloop:${APP_VERSION:-local}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      PORT: "8000"
+      APP_ENV: local
+      DATABASE_URL: postgresql+psycopg://learnloop:learnloop@db:5432/learnloop
+      # Leave empty locally (writes open). Set it to protect writes.
+      WRITE_TOKEN: ${WRITE_TOKEN:-}
+      TELEMETRY_EXPORTER: otlp
+      OTEL_SERVICE_NAME: learnloop
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_METRIC_EXPORT_INTERVAL: "5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.119.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./ops/observability/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./ops/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./ops/observability/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki:/loki
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "127.0.0.1:${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./ops/observability/tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo:/var/tempo
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_FEATURE_TOGGLES_ENABLE: traceToMetrics
+    # Lets the alert webhook reach the on-call responder running on the host (:8001).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ops/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  prometheus:
+  loki:
+  tempo:
+  grafana:

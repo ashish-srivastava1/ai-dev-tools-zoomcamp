@@ -1,0 +1,56 @@
+# OpenTelemetry Collector: receives OTLP from the LearnLoop app and fans the three
+# signals out to Prometheus (metrics), Tempo (traces) and Loki (logs).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+  # Belt and braces for the privacy NFR: the app never records these, but drop
+  # them here too in case an instrumentation library adds them in future.
+  attributes/scrub:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: db.statement.parameters
+        action: delete
+      - key: url.query
+        action: delete
+
+exporters:
+  # Metrics are exposed in Prometheus format for Prometheus to scrape.
+  # Naming: counter learnloop_http_requests -> learnloop_http_requests_total,
+  # histogram learnloop_http_request_duration (unit s) -> ..._seconds_bucket/_sum/_count.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/scrub, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [attributes/scrub, batch]
+      exporters: [otlphttp/loki]

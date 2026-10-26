@@ -1,0 +1,15 @@
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.db
+**/*.sqlite
+ops/incidents
+ops/oncall/incidents
+.git
+.github
+*.log
+.env
+.env.*

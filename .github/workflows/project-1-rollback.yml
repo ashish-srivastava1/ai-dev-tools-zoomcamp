@@ -1,0 +1,81 @@
+# LearnLoop (Project-1) - rollback
+# Redeploys a previously published image (tagged with its commit SHA) to dev or
+# production. Uses the same GitHub environments as CD, so a production rollback
+# also needs a reviewer's approval. Runbook: Project-1/ops/rollback.md
+name: project-1-rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to roll back
+        type: choice
+        options: [dev, production]
+        default: dev
+      sha:
+        description: Full commit SHA (image tag) to roll back to, e.g. from the GHCR package page
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: project-1-deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.environment == 'production' && vars.PROD_URL || vars.DEV_URL }}
+    steps:
+      - name: Validate input and resolve image
+        id: img
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::sha must be a full 40-character commit SHA (images are tagged with the full SHA)"; exit 1
+          fi
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${owner}/learnloop:${SHA}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check the image tag exists in GHCR
+        run: |
+          docker manifest inspect "${{ steps.img.outputs.image }}" > /dev/null \
+            || { echo "::error::Image ${{ steps.img.outputs.image }} not found in GHCR"; exit 1; }
+      - name: Redeploy previous image
+        env:
+          HOOK: ${{ inputs.environment == 'production' && secrets.RENDER_DEPLOY_HOOK_PROD || secrets.RENDER_DEPLOY_HOOK_DEV }}
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "::error::Deploy hook secret for ${{ inputs.environment }} is not configured"; exit 1; fi
+          img="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$IMAGE")"
+          curl -fsS -X POST "${HOOK}&imgURL=${img}" -o /dev/null
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ inputs.environment == 'production' && vars.PROD_URL || vars.DEV_URL }}
+        run: |
+          if [ -z "$BASE_URL" ]; then echo "::error::DEV_URL/PROD_URL variable not configured"; exit 1; fi
+          base="${BASE_URL%/}"
+          sleep 20
+          for i in $(seq 1 60); do
+            if curl -fsS "$base/health" | grep -q '"ok"'; then echo "healthy after $((i*5))s"; break; fi
+            sleep 5
+            if [ "$i" = 60 ]; then echo "::error::$base/health not healthy after 5 minutes"; exit 1; fi
+          done
+          code="$(curl -s -o /dev/null -w '%{http_code}' "$base/api/dashboard")"
+          [ "$code" = 200 ] || { echo "::error::/api/dashboard returned $code"; exit 1; }
+          {
+            echo "### Rolled back ${{ inputs.environment }}"
+            echo "- Image: \`${{ steps.img.outputs.image }}\`"
+            echo "- URL: $base"
+            echo "- Triggered by: @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"
